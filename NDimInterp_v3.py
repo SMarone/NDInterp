@@ -6,19 +6,8 @@ import time
 import math
 from mpl_toolkits.mplot3d import Axes3D
 
-## Notes:
-print 
-print '^---- N Dimensional Interpolation ----^'
-print 
-
-## Written by Stephen Marone at NASA GRC
-## Nomenclature:
-# LN-LinearNearest Neighbor,   WN-Weighted Nearest Neighbor, 
-# CN-Cosine Nearest Neighbor,  HN-Hermite Nearest Neighbor
-# prd - Predicted Points: Points which you want the values at
-# trn - Training Points:  Points with known values 
-# Ind - Independent: Dimensions which should be known
-# Dep - Dependant:   Dimensions which are a function of Ind
+## This is an n-dimensional interpolation code.  More information can be found
+# at the end of the code.
 
 # Setting up the original problem ==============================================
 
@@ -99,15 +88,22 @@ class N_Data(object):
 			return
 
 		if (self.funct == 'Crate'):
-			x = self.points[:,0]
+  			x = self.points[:,0]
 			y = self.points[:,1]
+			print 'Setting up Crate Function'
+			print '-Maximum x and y:', max(x)
+			print '-Minimum x and y:', min(x)
+			print
 			## Egg Crate Function
 			z = -x * np.sin(np.sqrt(abs(x - y - 47))) - \
 			    (y+47) * np.sin(np.sqrt(abs(x/2 + y + 47)))
-			self.values = z
 		elif (self.funct == 'PW'):
 			x = self.points[:,0]
 			y = self.points[:,1]
+			print 'Setting up Piecewise Function'
+		 	print '-Maximum x and y:', max(x)
+			print '-Minimum x and y:', min(x)
+			print
 			z = np.empty(len(x))
 			## Piecewise Function with 3 Planes
 			count = 0
@@ -122,10 +118,11 @@ class N_Data(object):
 				else:
 					z[count] = 5*x[i] + 6*y[i]
 					count +=1
-			self.values = z
 		else:
 			print 'Function type not found.'
 			raise SystemExit
+		
+		self.values = z[:,np.newaxis]
 
 	def PlotResults(self, title):
 		## Plots the value results of a 3 dimensional problem
@@ -142,7 +139,8 @@ class N_Data(object):
 		y = self.points[:,1]
 		fig = plt.figure()
 		ax = fig.gca(projection='3d')
-		surf = ax.tricontour(x.flatten(), y.flatten(), self.values, 
+		surf = ax.tricontour(x.flatten(), y.flatten(), 
+							 self.values.flatten(), 
 							 100, rstride=1, cstride=1, 
 							 cmap=cm.coolwarm, linewidth=0, 
 							 antialiased=False)
@@ -221,7 +219,7 @@ class N_Data(object):
 
 		error = abs((zc-self.values)/(zc+0.000000000001)) * 100
 		avg = np.average(error)
-		'''
+		
 		if check:
 			for i in range(len(error)):
 				if (error[i] > 100):
@@ -230,8 +228,8 @@ class N_Data(object):
 					print '-Calculated Value:', zc[i]
 					print '-Found Value:', self.values[i] 
 					print
-		'''
-		print '%s Information' % title
+		
+		print '%s Error Information' % title
 		print '-Max Percent Error:', np.max(error)
 		print '-Average Percent Error:', avg
 		print
@@ -247,16 +245,20 @@ class N_Data(object):
 		self.error = error
 		self.actualvalues = zc
 
+
+# Interpolation Classes ========================================================
+
+
 class InterpBase(object):
 	## The shared aspects of all interpolators
-	def __init__(self, TrainPts, TrainVals, NumLeaves=8):
+	def __init__(self, TrnPts, TrnVals, NumLeaves=8):
 		## TrainPts and TrainVals are the known points and their
 		# respective values which will be interpolated against.
 		# The IType is the type of interpolation that the user wants.
-		self.tp = TrainPts
-		self.tv = TrainVals
-		self.dims = len(TrainPts[0,:]) + 1
-		self.ntpts = len(TrainPts[:,0])
+		self.tp = TrnPts
+		self.tv = TrnVals
+		self.dims = len(TrnPts[0,:]) + 1
+		self.ntpts = len(TrnPts[:,0])
 		self.nl = NumLeaves
 
 	def FindNeighs(self, PrdPts, N=5): 
@@ -276,7 +278,12 @@ class InterpBase(object):
 				print 'The problem has too few training points for'
 				print 'its number of dimensions.'
 				raise SystemExit
-
+		
+		print 'Interpolation Input Values'
+		print '-KDTree Leaves:', numleaves
+		print '-Number of Training Points:', numtrn
+		print '-Number of Predicted Points:', nppts
+		print
 		## Make into training data into a Tree
 		leavesz = math.ceil(numtrn/numleaves)
 		KData = spatial.KDTree(self.tp,leafsize=leavesz)
@@ -287,16 +294,16 @@ class InterpBase(object):
 		return nppts, ndist, nloc
 
 class LNInterp(InterpBase):
-	def __class__(self, PrdPts):
+	def __call__(self, PrdPts):
 		## This method uses linear interpolation by defining a plane with
 		# a set number of nearest neighbors to the predicted
 		dims = self.dims
-		
+
 		## Find them neigbors
-		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=self.dims)
+		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
 
 		print 'Weighted Nearest Neighbors (WNN) KDTree Results'
-		print '-Number of Neighbors per Predicted Point:', N
+		print '-Number of Neighbors per Predicted Point:', dims
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
 		## Extra Inputs for Finding the normal are found below
@@ -312,12 +319,12 @@ class LNInterp(InterpBase):
 		    da[i] = (r+1+i) % dims
 		    db[i] = (i-r-1) % dims
 		
-		for t in range(self.nppts):  ## Go through each predict point 
+		for t in range(nppts):  ## Go through each predict point 
 			if (np.all(abs(PrdPts - self.tp[nloc[t,0],:])) > 0.000001):
 				nvect = np.empty((0,dims), float)
 				## Planar vectors need both dep and ind dimensions
 				trnd = np.concatenate((self.tp[nloc[t,:],:] ,
-										self.tv[nloc[t,:],:]),
+										self.tv[nloc[t,:]]),
 				 							axis=1)
 				for n in range(dims-1): ## Go through each neighbor
 					## Creates array[neighbor, dimension] from NN results
@@ -330,11 +337,11 @@ class LNInterp(InterpBase):
 
 				## The pc is the constant of the n dimensional plane. 
 				## It uses the point which is from the closest neighbor
-				pc = np.dot(traindata[nloc[t,0],:],normal)
+				pc = np.dot(trnd[0,:],normal)
 
 				## Set the prddata to a temporary array so it has the same
 				# dimensions as the training data with z as 0 for now
-				prdtemp = np.concatenate((prddata[t,:], np.array([0])), 1)
+				prdtemp = np.concatenate((PrdPts[t,:], np.array([0])), 1)
 				
 				if (normal[-1] == 0):
 					print 'Error, dependent variable has infinite answers.'
@@ -352,7 +359,7 @@ class LNInterp(InterpBase):
 	
 class WNInterp(InterpBase):
 	## Weighted Neighbor Interpolation
-	def __class__(self, PrdPts, N=8, DistEff=5):
+	def __call__(self, PrdPts, N=8, DistEff=5):
 
 		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 		
@@ -365,9 +372,9 @@ class WNInterp(InterpBase):
 		for t in range(nppts):  ## Go through each predict point 
 			if (np.all(abs(PrdPts[t,:] - self.tp[nloc[t,0],:])) > 0.000001):
 				sumdist = np.sum(1/(ndist[t,:]**DistEff))
-				wt = np.sum(self.tv[nloc[t,:]]/(ndist[t,:]**DistEff))
+				wt = np.sum(self.tv[nloc[t,:]].T/(ndist[t,:]**DistEff))
 				prdz[t] = wt/sumdist
-	
+				
 			else:
 				## Closest neighbor overlaps predicted point
 				#print 'That just happened'
@@ -377,7 +384,7 @@ class WNInterp(InterpBase):
 
 class CNInterp(InterpBase):
 	## Cosine Neighbor Interpolation
-	def __class__(self, PrdPts, N=5, tension=0, bias=0):
+	def __call__(self, PrdPts, N=5, tension=0, bias=0):
 
 		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
@@ -449,7 +456,7 @@ class CNInterp(InterpBase):
 
 class HNInterp(InterpBase):
 	## Hermite Neighbor Interpolation
-	def HermFunct(y, mu, tension, bias):
+	def HermFunct(self, y, mu, tension, bias):
 		## Should  have 4 neighbor values (y) and percent distance along line 
 		# from y1 and y2 to get the wanted value (mu).  Bias and tension 
 		# are optional values.
@@ -468,7 +475,7 @@ class HNInterp(InterpBase):
 
 		return (a0*y[1] + a1*m0 + a2*m1 + a3*y[2])
 	
-	def __class__(self, PrdPts, N=8, tension=0, bias=0):
+	def __call__(self, PrdPts, N=8, tension=0, bias=0):
 		## Traindata has n dimensions, prddata has n-1 dimensions because last
 		# dimension is the dependant one we are solving for.  
 		## N neighbors will be found but only 4 will be used per dimension
@@ -481,8 +488,8 @@ class HNInterp(InterpBase):
 		print '-Number of Neighbors per Predicted Point:', N
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
-		for t in range(numprd):  ## Go through each predict point 
-			if (np.all(abs(prddata[t,:-1] - traindata[nloc[t,0],:-1])) > .001):
+		for t in range(nppts):  ## Go through each predict point 
+			if (np.all(abs(PrdPts[t,:] - self.tp[nloc[t,0],:])) > .001):
 				## This sorts the rows by the values in the column specified. 
 				## The neighvals dim is [neigh#, dimension] 
 
@@ -510,7 +517,7 @@ class HNInterp(InterpBase):
 				prdz[t] = self.HermFunct(orgneighs[:4,-1],
 										 diff, tension, bias)
 				'''
-				for D in range(dims-2):
+				for D in range(self.dims-2):
 					## Dim started above to initiate prdz, then continues to finish
 					dim = D+1
 					orgneighs = neighvals[neighvals[:,dim].argsort(),:]
@@ -538,11 +545,99 @@ class HNInterp(InterpBase):
 					prdz[t] = prdz[t]/2 ## Average with previous
 			else:
 				# Closest neighbor overlaps predicted point
-				print 'That just happened'
-				print (PrdPts[t,:-1] - self.tp[nloc[t,0],:-1])
+				#print 'That just happened'
+				#print (PrdPts[t,:-1] - self.tp[nloc[t,0],:-1])
 				prdz[t] = self.tv[nloc[t,0]]
 		return prdz
 
+## More Information (As Promised) ==============================================
+
+print 
+print '^---- N Dimensional Interpolation ----^'
+print 
+
+
+##   Written by Stephen Marone
+##     Intern at the NASA GRC  
+## Project Start - June 8th, 2015
+
+'''
+
+		\/\/ Nomenclature \/\/
+
+LN-LinearNearest Neighbor,   WN-Weighted Nearest Neighbor, 
+CN-Cosine Nearest Neighbor,  HN-Hermite Nearest Neighbor
+prd - Predicted Points: Points which you want the values at
+trn - Training Points:  Points with known values 
+Ind - Independent: Dimensions which should be known
+Dep - Dependant:   Dimensions which are a function of Ind
+
+
+		\/\/ Class Breakdown \/\/
+
+clss N_Data(object)
+df __init__(self, funct='None', dtype='None', dims=3)
+df AssignInd(self, points)
+df AssignDep(self, val)
+df CreateInd(self, mini, maxi, numpts)
+df CreateDep(self)
+df PlotResults(self, title)
+df PlotPoints(self, title)
+df FindError(self, title, plot=True, check=False)
+
+clss InterpBase(object)
+df __init__(self, TrnPts, TrnVals, NumLeaves=8)
+df FindNeighs(self, PrdPts, N=5)
+	rturn nppts, ndist, nloc
+
+clss LNInterp(InterpBase)
+df __call__(self, PrdPts)
+	rturn prdz
+	
+clss WNInterp(InterpBase)
+df __call__(self, PrdPts, N=8, DistEff=5)
+	rturn prdz
+
+clss CNInterp(InterpBase)
+df __call__(self, PrdPts, N=5, tension=0, bias=0)
+	rturn prdz
+
+clss HNInterp(InterpBase)
+df HermFunct(y, mu, tension, bias)
+	rturn (a0*y[1] + a1*m0 + a2*m1 + a3*y[2])
+df __call__(self, PrdPts, N=8, tension=0, bias=0)
+	return prdz
+
+
+Note - some vowels removed to ensure vim friendliness.
+'''
+
+## Running Code ================================================================
+
+print '^---- Running Code ----^'
+print
+
+train = N_Data('PW', 'rand')
+train.CreateInd(-500, 500, 500000)
+train.CreateDep()
+train.PlotResults('Training Data')
+trainInt = LNInterp(train.points, train.values, NumLeaves=100)
+
+pred = N_Data('PW', 'LH')
+pred.CreateInd(-500,500,1000)
+t0 = time.time()
+pred.AssignDep(trainInt(pred.points))
+t1 = time.time()
+pred.PlotResults('Predicted Data')
+pred.PlotPoints('Point Locations')
+pred.FindError('Good Stuff', True, False)
+
+print 'Interpolator Time:', (t1-t0)
+
+plt.show()
+
+
+'''
 check = N_Data('Crate', 'cart')
 check.CreateInd(-512,512,16641)
 check.CreateDep()
@@ -577,8 +672,8 @@ bs = N_Data('PW', 'LH', 7)
 #print bs.dims
 
 plt.show()
-
-## Side note, PrdPts are predicted points technically although it's not really 
+'''
+## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
 # but their value is unknown usually and can only be determined when related to
 # those around you.
