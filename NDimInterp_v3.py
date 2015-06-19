@@ -6,33 +6,37 @@ import time
 import math
 from mpl_toolkits.mplot3d import Axes3D
 
+##   Written by Stephen Marone
+##     Intern at the NASA GRC  
+## Project Start - June 8th, 2015
+
 ## This is an n-dimensional interpolation code.  More information can be found
-# at the end of the code.
+# at the end of the code along with the lines which run it.
 
 # Setting up the original problem ==============================================
 
 class N_Data(object):
 	## Main data type with N dimension.  Only needed if you want to use the 
 	# example functions, check for error, or plot.
-	def __init__(self, funct='None', dtype='None', dims=3):
+	def __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
 		## The funct is Crate or PW for Piecewise.
 		## The dtype is cart for cartesian or rand for random
 		self.funct = funct
 		self.dtype = dtype
 		self.dims = dims
-
-	def AssignInd(self, points):
-		self.points = points
-
-	def AssignDep(self, val):
-		self.values = val
-
-	def CreateInd(self, mini, maxi, numpts):
+		
+		print "Creating Independent Data"
+		print "-Function Type:", funct
+		print "-Data Distribution Type:", dtype
+		print "-Quantity of Points:", numpts
+		print "-Dimensions:", dims
+		print "-Range of each dimension: [%s,%s]" % (mini, maxi)
+		print
 		## Setup independent data for each function via distribution
-		if (self.dtype == 'rand'):
-			self.points = np.random.rand(numpts,self.dims-1) * \
+		if (dtype == 'rand'):
+			self.points = np.random.rand(numpts,dims-1) * \
 										(maxi-mini) + mini
-			if (self.funct == 'PW'):
+			if (funct == 'PW'):
 				## This ensures points exist on discontinuities
 				self.points[0,0] = mini/2
 				self.points[1,0] = mini
@@ -46,16 +50,16 @@ class N_Data(object):
 				self.points[7,1] = maxi/2
 				self.points[8,1] = maxi
 
-		elif (self.dtype == 'LH'):
-			points = np.zeros((numpts,self.dims-1), dtype="float")
-			for d in range(self.dims-1):
+		elif (dtype == 'LH'):
+			points = np.zeros((numpts,dims-1), dtype="float")
+			for d in range(dims-1):
 				## Latin Hypercube it up
 				points[:,d] = np.linspace(mini,maxi,numpts)
 				np.random.shuffle(points[:,d])
 			self.points = points
 			
-		elif (self.dtype == 'cart'):
-			if (self.dims == 3):
+		elif (dtype == 'cart'):
+			if (dims == 3):
 				stp = (maxi-mini)/(np.sqrt(numpts)-1)
 				x = np.arange(mini,(maxi+stp),stp)
 				y = np.arange(mini,(maxi+stp),stp)
@@ -76,23 +80,17 @@ class N_Data(object):
 			print 'Distribution type not found.'
 			raise SystemExit
 
+	def AssignDep(self, values):
+		## Takes numpy array of values and stores inside the class variable
+		self.values = values[:,np.newaxis]
+
 	def CreateDep(self):
 		## This not only creates z but the data subtype as well
 		
-		## Check if points have been created
-		try:
-			self.points
-		except NameError:
-			print 'Independent variables must be created first'
-			print
-			return
-
 		if (self.funct == 'Crate'):
   			x = self.points[:,0]
 			y = self.points[:,1]
-			print 'Setting up Crate Function'
-			print '-Maximum x and y:', max(x)
-			print '-Minimum x and y:', min(x)
+			print 'Setting up Crate Function Dependents'
 			print
 			## Egg Crate Function
 			z = -x * np.sin(np.sqrt(abs(x - y - 47))) - \
@@ -100,9 +98,7 @@ class N_Data(object):
 		elif (self.funct == 'PW'):
 			x = self.points[:,0]
 			y = self.points[:,1]
-			print 'Setting up Piecewise Function'
-		 	print '-Maximum x and y:', max(x)
-			print '-Minimum x and y:', min(x)
+			print 'Setting up Piecewise Function Dependents'
 			print
 			z = np.empty(len(x))
 			## Piecewise Function with 3 Planes
@@ -129,10 +125,9 @@ class N_Data(object):
 
 		## Ensure points and values have been created
 		try:
-			self.points
 			self.values
 		except NameError:
-			print 'Points or values have not been set.'
+			print 'Values have not been set.'
 			return
 
 		x = self.points[:,0]
@@ -145,7 +140,7 @@ class N_Data(object):
 							 cmap=cm.coolwarm, linewidth=0, 
 							 antialiased=False)
 		fig.colorbar(surf, shrink=0.5, aspect=5)
-		fig.suptitle('%s' % title, 
+		fig.suptitle('%s Results' % title, 
 					 fontsize=14, fontweight='bold')
 		ax.set_xlabel('X - Independent Variable')
 		ax.set_ylabel('Y - Independent Variable')
@@ -164,7 +159,7 @@ class N_Data(object):
 		fig = plt.figure()
 		if (self.dims == 3):
 			plt.scatter(self.points[:,0], self.points[:,1])
-			fig.suptitle('%s' % title, 
+			fig.suptitle('%s Point Locations' % title, 
 							fontsize=14, fontweight='bold')
 			plt.xlabel('X Value')
 			plt.ylabel('Y Value')
@@ -172,7 +167,7 @@ class N_Data(object):
 			ax = fig.gca(projection='3d')
 			ax.scatter(self.points[:,0], self.points[:,1], 
 						self.points[:,2], c=c, marker=m)
-			fig.suptitle('%s' % title, 
+			fig.suptitle('%s Point Locations' % title, 
 							fontsize=14, fontweight='bold')
 			ax.set_xlabel('X Value')
 			ax.set_ylabel('Y Value')
@@ -183,15 +178,15 @@ class N_Data(object):
 		
 		## Ensure points and values have been created
 		try:
-			self.points
 			self.values
 		except NameError:
-			print 'Points or values have not been set.'
+			print 'Values have not been set.'
 			return
 
+		vals = self.values.flatten()
 		xc = self.points[:,0]
 		yc = self.points[:,1]
-		loc = 1+np.arange(len(self.values), dtype='float')
+		loc = 1+np.arange(len(vals), dtype='float')
 		
 		if (self.funct == 'Crate'):
 			zc = -xc * np.sin(np.sqrt(abs(xc - yc - 47))) - \
@@ -216,8 +211,7 @@ class N_Data(object):
 			print 'No function available for comparison.'
 			print
 			return
-
-		error = abs((zc-self.values)/(zc+0.000000000001)) * 100
+		error = abs((zc-vals)/(zc+0.000000000001)) * 100
 		avg = np.average(error)
 		
 		if check:
@@ -226,18 +220,19 @@ class N_Data(object):
 					print '**High Percent Error found of', error[i], '**'
 					print '-Location:', xc[i], yc[i]
 					print '-Calculated Value:', zc[i]
-					print '-Found Value:', self.values[i] 
+					print '-Found Value:', vals[i] 
 					print
 		
 		print '%s Error Information' % title
-		print '-Max Percent Error:', np.max(error)
 		print '-Average Percent Error:', avg
+		print '-Max Percent Error:', np.max(error)
 		print
 
 		if plot:
 			fig = plt.figure()
 			plt.plot(loc, error, 'k')
-			fig.suptitle('%s Per Point' % title, fontsize=14, fontweight='bold')
+			fig.suptitle('%s Error Per Point' % title, 
+						  fontsize=14, fontweight='bold')
 			plt.xlabel('Point Identifier')
 			plt.ylabel('Percent Error')
 			plt.ylim((0,((avg+0.00000000001)*2)))
@@ -245,6 +240,10 @@ class N_Data(object):
 		self.error = error
 		self.actualvalues = zc
 
+	def PlotAll(self,title, check=False):
+		self.PlotResults(title)
+		self.PlotPoints(title)
+		self.FindError(title, True, check)
 
 # Interpolation Classes ========================================================
 
@@ -281,6 +280,7 @@ class InterpBase(object):
 		
 		print 'Interpolation Input Values'
 		print '-KDTree Leaves:', numleaves
+		print '-Number of Neighbors per Predicted Point:', N
 		print '-Number of Training Points:', numtrn
 		print '-Number of Predicted Points:', nppts
 		print
@@ -302,12 +302,13 @@ class LNInterp(InterpBase):
 		## Find them neigbors
 		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
 
-		print 'Weighted Nearest Neighbors (WNN) KDTree Results'
-		print '-Number of Neighbors per Predicted Point:', dims
+		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
+		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
 		## Extra Inputs for Finding the normal are found below
-		prdz = np.zeros((nppts), dtype="float")
+		prdz   =   np.zeros((nppts), dtype="float")
+		gradient = np.zeros((nppts, dims-1), dtype="float")
 
 		## Number of row vectors needed always dimensions - 1
 		r = np.arange(dims-1, dtype="int")
@@ -320,40 +321,36 @@ class LNInterp(InterpBase):
 		    db[i] = (i-r-1) % dims
 		
 		for t in range(nppts):  ## Go through each predict point 
-			if (np.all(abs(PrdPts - self.tp[nloc[t,0],:])) > 0.000001):
-				nvect = np.empty((0,dims), float)
-				## Planar vectors need both dep and ind dimensions
-				trnd = np.concatenate((self.tp[nloc[t,:],:] ,
-										self.tv[nloc[t,:]]),
-				 							axis=1)
-				for n in range(dims-1): ## Go through each neighbor
-					## Creates array[neighbor, dimension] from NN results
-					nvect = np.append(nvect, [trnd[(n+1),:] - trnd[n,:]], 0)
+			nvect = np.empty((0,dims), float)
+			## Planar vectors need both dep and ind dimensions
+			trnd = np.concatenate((self.tp[nloc[t,:],:] ,
+									self.tv[nloc[t,:]]),
+			 							axis=1)
+			for n in range(dims-1): ## Go through each neighbor
+				## Creates array[neighbor, dimension] from NN results
+				nvect = np.append(nvect, [trnd[(n+1),:] - trnd[n,:]], 0)
 	
-				## It is known that found array will be size [dims-1, dims]
-				# and can be used below to in an exterior product.
-				normal = np.prod(nvect[r,da], axis=1) - \
-						 np.prod(nvect[r,db], axis=1)
+			## It is known that found array will be size [dims-1, dims]
+			# and can be used below to in an exterior product.
+			normal = np.prod(nvect[r,da], axis=1) - \
+					 np.prod(nvect[r,db], axis=1)
 
-				## The pc is the constant of the n dimensional plane. 
-				## It uses the point which is from the closest neighbor
-				pc = np.dot(trnd[0,:],normal)
+			## The pc is the constant of the n dimensional plane. 
+			## It uses the point which is from the closest neighbor
+			pc = np.dot(trnd[0,:],normal)
 
-				## Set the prddata to a temporary array so it has the same
-				# dimensions as the training data with z as 0 for now
-				prdtemp = np.concatenate((PrdPts[t,:], np.array([0])), 1)
-				
-				if (normal[-1] == 0):
-					print 'Error, dependent variable has infinite answers.'
-					raise SystemExit
-				prdz[t] = (np.dot(prdtemp,normal)-pc)/-normal[-1]
+			## Set the prddata to a temporary array so it has the same
+			# dimensions as the training data with z as 0 for now
+			prdtemp = np.concatenate((PrdPts[t,:], np.array([0])), 1)
+			
+			if (normal[-1] == 0):
+				print 'Error, dependent variable has infinite answers.'
+				raise SystemExit
+
+
+			gradient[t,:] = -normal[:-1]/normal[-1]
+			prdz[t] = (np.dot(prdtemp,normal)-pc)/-normal[-1]
 	
-			else:
-				## Closest neighbor overlaps predicted point
-				#print 'That just happened'
-				#print (prddata[t,:-1] - traindata[nloc[t,0],:-1])
-				prdz[t] = self.tv[nloc[t,0]]
-		
 			#prddict['%s' % prddata[t,:]] = prdz[t] #from when I wanted a dict
 		return prdz
 	
@@ -365,21 +362,19 @@ class WNInterp(InterpBase):
 		
 		prdz = np.zeros((nppts), dtype="float")
 
-		print 'Weighted Nearest Neighbors (WNN) KDTree Results'
-		print '-Number of Neighbors per Predicted Point:', N
+		print 'Weighted Nearest Neighbors (WN) KDTree Results'
+		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
 		for t in range(nppts):  ## Go through each predict point 
-			if (np.all(abs(PrdPts[t,:] - self.tp[nloc[t,0],:])) > 0.000001):
-				sumdist = np.sum(1/(ndist[t,:]**DistEff))
-				wt = np.sum(self.tv[nloc[t,:]].T/(ndist[t,:]**DistEff))
-				prdz[t] = wt/sumdist
-				
-			else:
-				## Closest neighbor overlaps predicted point
-				#print 'That just happened'
-				#print (prddata[t,:-1] - traindata[nloc[t,0],:-1])
-				prdz[t] = self.tv[nloc[t,0]]
+			sumdist = np.sum(1/(ndist[t,:]**DistEff))
+			wt = np.sum(self.tv[nloc[t,:]].T/(ndist[t,:]**DistEff))
+			prdz[t] = wt/sumdist
+		'''
+		part = ndist**DistEff
+		sumdist = np.sum(1/part, axis=1)
+		wt = np.sum(self.tv[nloc].T/part, axis=1))  
+		'''	
 		return prdz
 
 class CNInterp(InterpBase):
@@ -391,7 +386,7 @@ class CNInterp(InterpBase):
 		prdz = np.zeros((nppts), dtype="float")
 		
 		print 'Cosine Nearest Neighbors (CN) Interpolation KDTree Results'
-		print '-Number of Neighbors per Predicted Point:', N
+		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
 		for t in range(nppts):  ## Go through each predict point 
@@ -417,7 +412,7 @@ class CNInterp(InterpBase):
 				        (orgneighs[i,0]-orgneighs[i-1,0]))
 				mu2 = (1-np.cos(diff*np.pi))/2
 				prdz[t] = orgneighs[i-1,-1]*(1-mu2) + orgneighs[i,-1]*mu2
-				'''
+				''' This is not as accurate but removes the while loop
 				diff = ((PrdPts[t,0] - orgneighs[0,0]) / 
 				        (orgneighs[1,0]-orgneighs[0,0]))
 				prdz[t] = y[0]*(1-diff) + y[1]*diff
@@ -441,7 +436,7 @@ class CNInterp(InterpBase):
 					        (orgneighs[i,dim]-orgneighs[i-1,dim]))
 					mu2 = (1-np.cos(diff*np.pi))/2
 					prdz[t] += orgneighs[i-1,-1]*(1-mu2) + orgneighs[i,-1]*mu2
-					'''
+					''' This is not as accurate but removes the while loop
 					diff = ((PrdPts[t,dim] - orgneighs[0,dim]) / 
 				    	    (orgneighs[1,dim]-orgneighs[0,dim]))
 					prdz[t] += y[0]*(1-diff) + y[1]*diff
@@ -477,7 +472,7 @@ class HNInterp(InterpBase):
 	
 	def __call__(self, PrdPts, N=8, tension=0, bias=0):
 		## Traindata has n dimensions, prddata has n-1 dimensions because last
-		# dimension is the dependant one we are solving for.  
+		# dimension is the dependent one we are solving for.  
 		## N neighbors will be found but only 4 will be used per dimension
 
 		nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
@@ -485,7 +480,7 @@ class HNInterp(InterpBase):
 		prdz = np.zeros((nppts), dtype="float")
 		
 		print 'Hermite Nearest Neighbors (HN) Interpolation KDTree Results'
-		print '-Number of Neighbors per Predicted Point:', N
+		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
 		for t in range(nppts):  ## Go through each predict point 
@@ -511,7 +506,7 @@ class HNInterp(InterpBase):
 				        (orgneighs[i+2,0]-orgneighs[i-1,0]))
 				prdz[t] = self.HermFunct(orgneighs[(i-2):(i+2),-1],
 										 diff, tension, bias)
-				'''
+				''' This is not as accurate but removes the while loop
 				diff = ((PrdPts[t,0] - orgneighs[0,0]) / 
 				        (orgneighs[3,0]-orgneighs[0,0]))
 				prdz[t] = self.HermFunct(orgneighs[:4,-1],
@@ -536,7 +531,7 @@ class HNInterp(InterpBase):
 					        (orgneighs[i+2,dim]-orgneighs[i-1,dim]))
 					prdz[t] += self.HermFunct(orgneighs[(i-2):(i+2),-1],
 											  diff, tension, bias)
-					'''
+					''' This is not as accurate but removes the while loop
 					diff = ((PrdPts[t,dim] - orgneighs[0,dim]) / 
 				    	    (orgneighs[3,dim]-orgneighs[0,dim]))
 					prdz[t] += self.HermFunct(orgneighs[:4,-1],
@@ -557,33 +552,28 @@ print '^---- N Dimensional Interpolation ----^'
 print 
 
 
-##   Written by Stephen Marone
-##     Intern at the NASA GRC  
-## Project Start - June 8th, 2015
-
 '''
 
-		\/\/ Nomenclature \/\/
+		 \/\/ Nomenclature \/\/
 
 LN-LinearNearest Neighbor,   WN-Weighted Nearest Neighbor, 
 CN-Cosine Nearest Neighbor,  HN-Hermite Nearest Neighbor
 prd - Predicted Points: Points which you want the values at
 trn - Training Points:  Points with known values 
 Ind - Independent: Dimensions which should be known
-Dep - Dependant:   Dimensions which are a function of Ind
+Dep - Dependent:   Dimensions which are a function of Ind
 
 
 		\/\/ Class Breakdown \/\/
 
 clss N_Data(object)
-df __init__(self, funct='None', dtype='None', dims=3)
-df AssignInd(self, points)
+df __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
 df AssignDep(self, val)
-df CreateInd(self, mini, maxi, numpts)
 df CreateDep(self)
 df PlotResults(self, title)
 df PlotPoints(self, title)
 df FindError(self, title, plot=True, check=False)
+df PlotAll(self, title, check=False)
 
 clss InterpBase(object)
 df __init__(self, TrnPts, TrnVals, NumLeaves=8)
@@ -614,65 +604,64 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Running Code ================================================================
 
-print '^---- Running Code ----^'
+
+## Create the Independent Data
+train = N_Data(-500, 500, 500000)
+pred = N_Data(-500, 500, 1000, 'PW', 'LH')
+
+## Set Dependents for Training Data and Plot
+train.CreateDep()
+train.PlotResults('Training Data')
+
+## Setup Interpolation Methods around Training Points
+trainLNInt = LNInterp(train.points, train.values, NumLeaves=100)
+trainWNInt = WNInterp(train.points, train.values, NumLeaves=100)
+trainCNInt = CNInterp(train.points, train.values, NumLeaves=100)
+trainHNInt = HNInterp(train.points, train.values, NumLeaves=100)
+
+print '^---- Running Interpolation Code ----^'
 print
 
-train = N_Data('PW', 'rand')
-train.CreateInd(-500, 500, 500000)
-train.CreateDep()
-train.PlotResults('Training Data')
-trainInt = LNInterp(train.points, train.values, NumLeaves=100)
-
-pred = N_Data('PW', 'LH')
-pred.CreateInd(-500,500,1000)
+## Perform Interpolation on Predicted Points
 t0 = time.time()
-pred.AssignDep(trainInt(pred.points))
+pred.AssignDep(trainLNInt(pred.points))
 t1 = time.time()
-pred.PlotResults('Predicted Data')
-pred.PlotPoints('Point Locations')
-pred.FindError('Good Stuff', True, False)
 
-print 'Interpolator Time:', (t1-t0)
+## Plot All Results, Point Locations, and Error
+pred.PlotAll('LN Predicted Data')
 
-plt.show()
+## Perform Interpolation on Predicted Points
+t2 = time.time()
+pred.AssignDep(trainWNInt(pred.points))
+t3 = time.time()
 
+## Plot All Results, Point Locations, and Error
+pred.PlotAll('WN Predicted Data')
 
-'''
-check = N_Data('Crate', 'cart')
-check.CreateInd(-512,512,16641)
-check.CreateDep()
-check.PlotResults('Checked Data')
-#print check.funct
-#print check.dtype
-#print len(check.points)
-#print check.points
-check.FindError('Checked Data')
+## Perform Interpolation on Predicted Points
+t4 = time.time()
+pred.AssignDep(trainCNInt(pred.points))
+t5 = time.time()
 
-train = N_Data('PW', 'rand')
-train.CreateInd(-500,500,50000)
-train.CreateDep()
-train.PlotResults('Training Data')
-#print len(train.points)
-#print train.points
-#print train.dims
-train.FindError('Training Data', False, True)
+## Plot All Results, Point Locations, and Error
+pred.PlotAll('CN Predicted Data')
 
-pred = N_Data('Crate', 'LH', 3)
-pred.CreateInd(-512,512,81)
-pred.AssignDep(check.values[:81])
-pred.PlotResults('Predicted Data')
-pred.PlotPoints('Point Locations')
-#print pred.points.shape
-#print len(pred.points)
-#print pred.points
-#print pred.dims
-pred.FindError('Bad Stuff', True, True)
+## Perform Interpolation on Predicted Points
+t6 = time.time()
+pred.AssignDep(trainHNInt(pred.points))
+t7 = time.time()
 
-bs = N_Data('PW', 'LH', 7)
-#print bs.dims
+## Plot All Results, Point Locations, and Error
+pred.PlotAll('HN Predicted Data')
+
+print 'Run Times'
+print '-LN Interpolator:', (t1-t0)
+print '-WN Interpolator:', (t3-t2)
+print '-CN Interpolator:', (t5-t4)
+print '-HN Interpolator:', (t7-t6)
 
 plt.show()
-'''
+
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
 # but their value is unknown usually and can only be determined when related to
