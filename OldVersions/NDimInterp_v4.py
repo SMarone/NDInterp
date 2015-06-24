@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import time
 import math
 from mpl_toolkits.mplot3d import Axes3D
+import copy as cp
 
 ##   Written by Stephen Marone
 ##     Intern at the NASA GRC  
@@ -269,8 +270,6 @@ class InterpBase(object):
 		numleaves = self.nl
 
 		prdz   =   np.zeros((nppts), dtype="float")
-		gradient = np.zeros((nppts, self.dims-1), dtype="float")
-
 		if (numleaves > (numtrn/N)):
 			## Can not have more leaves than training data points. Also 
 			# need to ensure there will be enough neighbors in each leaf
@@ -294,7 +293,7 @@ class InterpBase(object):
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
 		ndist, nloc = KData.query(PrdPts ,N)
-		return prdz, gradient, nppts, ndist, nloc
+		return prdz, nppts, ndist, nloc
 
 class LNInterp(InterpBase):
 	def __call__(self, PrdPts):
@@ -303,7 +302,7 @@ class LNInterp(InterpBase):
 		dims = self.dims
 
 		## Find them neigbors
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
+		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
 
 		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -326,9 +325,9 @@ class LNInterp(InterpBase):
 		                       axis=2)
 		## Set the prddata to a temporary array so it has the same
 		# dimensions as the training data with z as 0 for now
-		prdtemp = np.concatenate((PrdPts, np.zeros((nppts,1),float)), 1)
+		prdtemp = np.concatenate((PrdPts, np.zeros((nppts,1),dtype='float')), 1)
 		
-		nvect = np.empty((nppts,(dims-1),dims), float)
+		nvect = np.empty((nppts,(dims-1),dims), dtype='float')
 		for n in range(dims-1): ## Go through each neighbor
 		    ## Creates array[neighbor, dimension] from NN results
 		    nvect[:,n,:] = trnd[:,(n+1),:] - trnd[:,n,:]
@@ -345,8 +344,7 @@ class LNInterp(InterpBase):
 		if (np.any(normal[-1]) == 0):
 		    print 'Error, dependent variable has infinite answers.'
 		    raise SystemExit
-		
-		gradient = -normal[:,:-1]/normal[:,-1:]
+
 		prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)/-normal[:,-1]
 		return prdz
 	
@@ -354,32 +352,27 @@ class WNInterp(InterpBase):
 	## Weighted Neighbor Interpolation
 	def __call__(self, PrdPts, N=5, DistEff=5):
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
 		print 'Weighted Nearest Neighbors (WN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
+
+		## Find the weighted neighbors per defined formula for distance effect
 		part = ndist**DistEff
-		sumdist = np.sum(1/part, axis=1)
+		sd = np.sum(1/part, axis=1)
 		vals = self.tv[nloc]
 		wt = np.sum(vals[:,:,0]/part, axis=1)  
-		prdz = wt/sumdist
-		pdims = self.dims - 1
+		prdz = wt/sd
 
-		dimdiff = np.subtract(PrdPts.reshape(nppts,1,pdims), self.tp[nloc,:])
-		gradient = np.sum(((DistEff*vals * dimdiff) / \
-						   (ndist.reshape(nppts,N,1)**2)) * 
-						   (1-(1/(part.reshape(nppts,N,1) * \
-								  sumdist.reshape(nppts,1,1))))
-									, axis=1)
 		return prdz
 
 class CNInterp(InterpBase):
 	## Cosine Neighbor Interpolation
 	def __call__(self, PrdPts, N=5, tension=0, bias=0):
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 		
 		print 'Cosine Nearest Neighbors (CN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -392,7 +385,7 @@ class CNInterp(InterpBase):
 									self.tv[nloc,:]),
 		 							axis=2)
 		tprdz = np.zeros((1,nppts), dtype='float')
-		orgneighs = np.empty((nppts,N,self.dims), float)
+		orgneighs = np.empty((nppts,N,self.dims), dtype='float')
 		anppts = np.arange(nppts)
 		for D in range(self.dims-1):
 			#orgneighs = neighvals[np.arange(nppts), 
@@ -407,18 +400,17 @@ class CNInterp(InterpBase):
 			## Gives the indices of the closest neighbors to each prdpt per dim.
 			cnd = np.argmin((np.abs(podiff)), axis=1)
 			## If the closest neighbor per dim is a smaller value, add 1.
-			cnd += np.ceil(-podiff[anppts,cnd] / \
-					np.abs(podiff[anppts,cnd]*2))
+			cnd += np.ceil((-podiff[anppts,cnd]+0.00000000000001) / \
+					(np.abs(podiff[anppts,cnd]*2)+0.00000000000001))
 			## Stay in the range!
 			cnd[cnd == 0] = 1
 			cnd[cnd == N] = N-1
-			
 			diff = -podiff[anppts,(cnd-1)] / \
-			       (orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])
-			mu2 = (1-np.cos(diff*np.pi))/2
-			tprdz += orgneighs[anppts,(cnd-1),-1] * (1-mu2) + \
-					 orgneighs[anppts,cnd,-1] * mu2
+					(orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])     
+			mu2 = (1-np.cos(np.pi*diff))/2
 
+			tprdz += orgneighs[anppts,cnd,-1]*mu2 + \
+					 orgneighs[anppts,(cnd-1),-1]*(1-mu2)
 		prdz = tprdz/(D+1)
 		return prdz
 
@@ -436,6 +428,7 @@ class HNInterp(InterpBase):
 		m0 += (y[:,2]-y[:,1])*(1-bias)*(1-tension)/2
 		m1  = (y[:,2]-y[:,1])*(1+bias)*(1-tension)/2
 		m1 += (y[:,3]-y[:,2])*(1-bias)*(1-tension)/2
+
 		a0 =  2*mu3 - 3*mu2 + 1
 		a1 =    mu3 - 2*mu2 + mu
 		a2 =    mu3 -   mu2
@@ -448,7 +441,7 @@ class HNInterp(InterpBase):
 		# dimension is the dependent one we are solving for.  
 		## N neighbors will be found but only 4 will be used per dimension
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
 		print 'Hermite Nearest Neighbors (HN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -461,9 +454,9 @@ class HNInterp(InterpBase):
 									self.tv[nloc,:]),
 		 							axis=2)
 		tprdz = np.zeros((1,nppts), dtype='float')
-		orgneighs = np.empty((nppts,N,self.dims), float)
+		orgneighs = np.empty((nppts,N,self.dims), dtype='float')
 		anppts = np.arange(nppts)
-		y = np.empty((nppts,4), float)
+		y = np.empty((nppts,4), dtype='float')
 		for D in range(self.dims-1):
 			#orgneighs = neighvals[np.arange(nppts), 
 			#					  neighvals[:,:,0].argsort(),
@@ -484,12 +477,12 @@ class HNInterp(InterpBase):
 			cnd[cnd >= (N-1)] = N-2
 		
 			## Find location of value in min and max of neighvals to be used
-			diff = -podiff[anppts,(cnd-2)] / \
-			       (orgneighs[anppts,(cnd+1),D] - orgneighs[anppts,(cnd-2),D])
+			ddiff = 1/(orgneighs[anppts,(cnd+1),D]-orgneighs[anppts,(cnd-2),D])
+			diff = -podiff[anppts,(cnd-2)] * ddiff 
 			for n in range(4):
 				## Only need 4 inputs.  Would like to remove this sometime
 				y[:,n] = orgneighs[anppts,(cnd-2+n),-1]
-			tprdz += self.HermFunctArr(y, diff, tension, bias)
+			tprdz += self.HermFunctArr(y,diff,tension,bias)
 			#tprdz = self.HermFunctArr(orgneighs[anppts,np.array([np.arange((cnd-2),N),]*nppts),-1], diff,tension,bias)
 
 		prdz = tprdz/(D+1)
@@ -543,8 +536,8 @@ df __call__(self, PrdPts, N=5, tension=0, bias=0)
 	rturn prdz
 
 clss HNInterp(InterpBase)
-df HermFunct(y, mu, tension, bias)
-	rturn (a0*y[1] + a1*m0 + a2*m1 + a3*y[2])
+df HermFunctArr(y, mu, tension, bias)
+	rturn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2])
 df __call__(self, PrdPts, N=8, tension=0, bias=0)
 	return prdz
 
@@ -557,7 +550,10 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Create the Independent Data
 train = N_Data(-500, 500, 500000)
-pred = N_Data(-500, 500, 1000, 'PW', 'LH')
+predL = N_Data(-500, 500, 1000, 'PW', 'LH')
+predW = cp.deepcopy(predL)
+predC = cp.deepcopy(predL)
+predH = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
@@ -569,49 +565,63 @@ trainWNInt = WNInterp(train.points, train.values, NumLeaves=100)
 trainCNInt = CNInterp(train.points, train.values, NumLeaves=100)
 trainHNInt = HNInterp(train.points, train.values, NumLeaves=100)
 
+print
 print '^---- Running Interpolation Code ----^'
 print
 
 ## Perform Interpolation on Predicted Points
 t0 = time.time()
-pred.AssignDep(trainLNInt(pred.points))
+predL.AssignDep(trainLNInt(predL.points))
 t1 = time.time()
 
-## Plot All Results, Point Locations, and Error
-pred.PlotAll('LN Predicted Data')
-
-## Perform Interpolation on Predicted Points
 t2 = time.time()
-pred.AssignDep(trainWNInt(pred.points))
+predW.AssignDep(trainWNInt(predW.points))
 t3 = time.time()
 
-## Plot All Results, Point Locations, and Error
-pred.PlotAll('WN Predicted Data')
-
-## Perform Interpolation on Predicted Points
 t4 = time.time()
-pred.AssignDep(trainCNInt(pred.points))
+predC.AssignDep(trainCNInt(predC.points))
 t5 = time.time()
 
-## Plot All Results, Point Locations, and Error
-pred.PlotAll('CN Predicted Data')
-
-## Perform Interpolation on Predicted Points
 t6 = time.time()
-pred.AssignDep(trainHNInt(pred.points))
+predH.AssignDep(trainHNInt(predH.points))
 t7 = time.time()
 
 ## Plot All Results, Point Locations, and Error
-pred.PlotAll('HN Predicted Data')
+
+print
+print '^---- Checking Results ----^'
+print
+
+predL.PlotAll('LN Predicted Data')
+predW.PlotAll('WN Predicted Data')
+predC.PlotAll('CN Predicted Data')
+predH.PlotAll('HN Predicted Data')
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
 print '-WN Interpolator:', (t3-t2)
-
 print '-CN Interpolator:', (t5-t4)
 print '-HN Interpolator:', (t7-t6)
+print
 
-plt.show()
+print 'Gradients'
+print trainLNInt.gradient
+print trainWNInt.gradient
+print trainCNInt.gradient
+print trainHNInt.gradient
+'''
+with open("V4_Times.txt", "a") as efile:
+	efile.write("\nRun Times\n")
+	efile.write("\n-LN Interpolator:")
+	efile.write(str(t1-t0))
+	efile.write("\n-WN Interpolator:")
+	efile.write(str(t3-t2))
+	efile.write("\n-CN Interpolator:")
+	efile.write(str(t5-t4))
+	efile.write("\n-HN Interpolator:")
+	efile.write(str(t7-t6))
+'''
+#plt.show()
 
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,

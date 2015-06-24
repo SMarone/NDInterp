@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import time
 import math
 from mpl_toolkits.mplot3d import Axes3D
-
+import copy as cp
 
 ## Notes:
 print 
@@ -602,7 +602,7 @@ def PlotErrorPW(prddata, prdz, title):
 # Run Code =====================================================================
 
 ## Problem function type, choices: Crate=Egg Crate; PW=Piecewise
-PT = 'Crate'
+PT = 'PW'
 ## Predicted data selection type, choices: LH=Latin Hypercube; Rand=random
 PDT = 'LH'   
 
@@ -615,7 +615,7 @@ else:
 	raise SystemExit
 
 ## Misc. Code Inputs
-WN = 8 ## # of neighbors to solve for, affects WNN.  Default 8
+WN = 5 ## # of neighbors to solve for, affects WN.  Default 5
 HN = 8 ## # of neighbors to solve for, affects HN.  Min of 5, default 8
 CN = 5 ## # of neighbors to solve for, affects CN.  Min of 3, default 5
 L = 5 ## Value which alters weighted neighbors function dependance to distance
@@ -651,26 +651,30 @@ else:
 	raise SystemExit
 PlotPred2D(prddata, mini, maxi)
 
+wpd = cp.deepcopy(prddata)
+cpd = cp.deepcopy(prddata)
+hpd = cp.deepcopy(prddata)
+
 t1 = time.time()
 zch, zchd = N_Neighbors(traindata, prddata, numleaves)
 t2 = time.time()
-zchW, zchWd = N_WeightNeighbors(traindata, prddata, numleaves, WN, L)
+zchW, zchWd = N_WeightNeighbors(traindata, wpd, numleaves, WN, L)
 t3 = time.time()
-zchH, zchHd = N_HermNeighbors(traindata, prddata, numleaves, HN, tension, bias)
+zchH, zchHd = N_HermNeighbors(traindata, hpd, numleaves, HN, tension, bias)
 t4 = time.time()
-zchC, zchCd = N_CosNeighbors(traindata, prddata, numleaves, CN, tension, bias)
+zchC, zchCd = N_CosNeighbors(traindata, cpd, numleaves, CN, tension, bias)
 t5 = time.time()
 
 print 'Results Found and Plotting Now'
 print '-NN Interpolation Run Time:', (t2-t1)
 print '-WNN Interpolation Run Time:', (t3-t2)
-print '-HN Interpolation Run Time:', (t4-t3)
 print '-CN Interpolation Run Time:', (t5-t4)
+print '-HN Interpolation Run Time:', (t4-t3)
 print
 DataPlot(prddata[:,0], prddata[:,1], zch, 'NN Predicted Data')
-DataPlot(prddata[:,0], prddata[:,1], zchW, 'WNN Predicted Data')
-DataPlot(prddata[:,0], prddata[:,1], zchH, 'HN Predicted Data')
-DataPlot(prddata[:,0], prddata[:,1], zchC, 'CN Predicted Data')
+DataPlot(wpd[:,0], wpd[:,1], zchW, 'WNN Predicted Data')
+DataPlot(hpd[:,0], hpd[:,1], zchH, 'HN Predicted Data')
+DataPlot(cpd[:,0], cpd[:,1], zchC, 'CN Predicted Data')
 
 if (PT == 'Crate'):
 	PlotErrorCrate(prddata, zch, 'NN Error') 
@@ -683,4 +687,16 @@ elif (PT == 'PW'):
 	PlotErrorPW(prddata, zchH, 'HN Error') 
 	PlotErrorPW(prddata, zchC, 'CN Error') 
 
-plt.show()
+'''
+with open("LV2_Error.txt", "a") as efile:
+    efile.write("\nRun Times\n")
+    efile.write("\n-LN Interpolator:")
+    efile.write(str(t2-t1))
+    efile.write("\n-WN Interpolator:")
+    efile.write(str(t3-t2))
+    efile.write("\n-CN Interpolator:")
+    efile.write(str(t5-t4))
+    efile.write("\n-HN Interpolator:")
+    efile.write(str(t4-t3))
+'''
+#plt.show()
