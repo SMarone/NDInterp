@@ -81,9 +81,10 @@ class N_Data(object):
 			print 'Distribution type not found.'
 			raise SystemExit
 
-	def AssignDep(self, values):
+	def AssignDep(self, values, gradient=[0]):
 		## Takes numpy array of values and stores inside the class variable
 		self.values = values[:,np.newaxis]
+		self.gradient=gradient
 
 	def CreateDep(self):
 		## This not only creates z but the data subtype as well
@@ -174,7 +175,7 @@ class N_Data(object):
 			ax.set_ylabel('Y Value')
 			ax.set_zlabel('Z Value')
 
-	def FindError(self, title, plot=True, check=False):
+	def FindError(self, title, plot=True, check=False, step=0.00000001):
 		## Find and plot error of the found values
 		
 		## Ensure points and values have been created
@@ -222,12 +223,10 @@ class N_Data(object):
 					print '-Location:', xc[i], yc[i]
 					print '-Calculated Value:', zc[i]
 					print '-Found Value:', vals[i] 
-					print
 		
 		print '%s Error Information' % title
-		print '-Average Percent Error:', avg
-		print '-Max Percent Error:', np.max(error)
-		print
+		print '-Average Result Percent Error:', avg
+		print '-Max Result Percent Error:', np.max(error)
 
 		if plot:
 			fig = plt.figure()
@@ -240,6 +239,65 @@ class N_Data(object):
 
 		self.error = error
 		self.actualvalues = zc
+		
+		if (np.all(self.gradient) != 0):
+			## Use complex step to check nearby points with found gradient
+			g = np.empty((len(vals),2), dtype='float')
+			xs = xc + (step*1j)
+			ys = yc + (step*1j)
+			if (self.funct == 'Crate'):
+				zsx = -xs * np.sin(np.sqrt(abs(xs - yc - 47))) - \
+						(yc+47) * np.sin(np.sqrt(abs(xs/2 + yc + 47)))
+				zsy = -xc * np.sin(np.sqrt(abs(xc - ys - 47))) - \
+						(ys+47) * np.sin(np.sqrt(abs(xc/2 + ys + 47)))
+			elif (self.funct == 'PW'):
+				# Plot data against values from crate problem
+				zsx = np.empty(len(xs), dtype='complex')
+				zsy = np.empty(len(xs), dtype='complex')
+				# Make Piecewise Function with 3 Planes
+				count = 0
+				for i in range(len(xs)):
+					if (xs[i] > 0):
+						if (ys[i] > 0):
+							zsx[count] = xs[i] + 8*yc[i]
+							zsy[count] = xc[i] + 8*ys[i]
+							count +=1
+						else:
+							zsx[count] = 5*xs[i] + yc[i]
+							zsy[count] = 5*xc[i] + ys[i]
+							count +=1
+					else:
+						zsx[count] = 5*xs[i] + 6*yc[i]
+						zsy[count] = 5*xc[i] + 6*ys[i]
+						count +=1		
+			g[:,0] = zsx.imag/ step
+			g[:,1] = zsy.imag/ step
+			gerror = abs((g-self.gradient)/(g+0.000000000001)) * 100
+			gerror = np.sum(gerror, axis=1)/2
+			gavg = np.average(gerror)
+
+			if check:
+				for i in range(len(error)):
+					if (gerror[i] > 100):
+						print '**High Percent Error found of', gerror[i], '**'
+						print '-Location:', xc[i], yc[i]
+						print '-Calculated Value:', g[i,:]
+						print '-Found Value:', self.gradient[i,:] 
+			
+			print '-Average Gradient Percent Error:', gavg
+			print '-Max Gradient Percent Error:', np.max(gerror)
+	
+			if plot:
+				gfig = plt.figure()
+				plt.plot(loc, gerror, 'k')
+				gfig.suptitle('%s Gradient Error Per Point' % title, 
+							  fontsize=14, fontweight='bold')
+				plt.xlabel('Point Identifier')
+				plt.ylabel('Percent Error')
+				plt.ylim((0,((gavg+0.00000000001)*2)))
+	
+			self.gerror = gerror
+		print
 
 	def PlotAll(self,title, check=False):
 		self.PlotResults(title)
@@ -270,7 +328,7 @@ class InterpBase(object):
 		numleaves = self.nl
 
 		prdz   =   np.zeros((nppts), dtype="float")
-		self.gradient = np.zeros((nppts, self.dims-1), dtype="float")
+		gradient = np.zeros((nppts, self.dims-1), dtype="float")
 
 		if (numleaves > (numtrn/N)):
 			## Can not have more leaves than training data points. Also 
@@ -295,7 +353,7 @@ class InterpBase(object):
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
 		ndist, nloc = KData.query(PrdPts ,N)
-		return prdz, nppts, ndist, nloc
+		return prdz, gradient, nppts, ndist, nloc
 
 class LNInterp(InterpBase):
 	def __call__(self, PrdPts):
@@ -304,7 +362,7 @@ class LNInterp(InterpBase):
 		dims = self.dims
 
 		## Find them neigbors
-		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
+		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
 
 		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -347,16 +405,16 @@ class LNInterp(InterpBase):
 		    print 'Error, dependent variable has infinite answers.'
 		    raise SystemExit
 		
-		self.gradient = -normal[:,:-1]/normal[:,-1:]
+		gradient = -normal[:,:-1]/normal[:,-1:]
 		
 		prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)/-normal[:,-1]
-		return prdz
+		return prdz, gradient
 	
 class WNInterp(InterpBase):
 	## Weighted Neighbor Interpolation
 	def __call__(self, PrdPts, N=5, DistEff=5):
 
-		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
 		print 'Weighted Nearest Neighbors (WN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -382,15 +440,15 @@ class WNInterp(InterpBase):
 		
 		## Solve for gradient
 		const = (DistEff/(sd*sd)).reshape(nppts,1)
-		self.gradient = const*np.sum((vals/(ndist**DistEff)) * \
+		gradient = const*np.sum((vals/(ndist**DistEff)) * \
 						   (dsd-(sumdist*dimdiff/(ndist*ndist))), axis=1)
-		return prdz
+		return prdz, gradient
 
 class CNInterp(InterpBase):
 	## Cosine Neighbor Interpolation
 	def __call__(self, PrdPts, N=5, tension=0, bias=0):
 
-		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 		
 		print 'Cosine Nearest Neighbors (CN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -431,10 +489,10 @@ class CNInterp(InterpBase):
 			       
 			mu2 = (1-np.cos(np.pi*diff))/2
 			tprdz += zu * mu2 + zl * (1-mu2)
-			self.gradient[:,D] = ((np.pi/2)*(zu-zl)*ddiff)*np.sin(np.pi*diff) 
+			gradient[:,D] = ((np.pi/2)*(zu-zl)*ddiff)*np.sin(np.pi*diff) 
 
 		prdz = tprdz/(D+1)
-		return prdz
+		return prdz, gradient
 
 class HNInterp(InterpBase):
 	## Hermite Neighbor Interpolation
@@ -469,7 +527,7 @@ class HNInterp(InterpBase):
 		# dimension is the dependent one we are solving for.  
 		## N neighbors will be found but only 4 will be used per dimension
 
-		prdz, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
 		print 'Hermite Nearest Neighbors (HN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -510,13 +568,13 @@ class HNInterp(InterpBase):
 			for n in range(4):
 				## Only need 4 inputs.  Would like to remove this sometime
 				y[:,n] = orgneighs[anppts,(cnd-2+n),-1]
-			t1, self.gradient[:,D] = \
+			t1, gradient[:,D] = \
 					self.HermFunctArr(y,diff,ddiff,tension,bias)
 			tprdz += t1
 			#tprdz = self.HermFunctArr(orgneighs[anppts,np.array([np.arange((cnd-2),N),]*nppts),-1], diff,tension,bias)
 
 		prdz = tprdz/(D+1)
-		return prdz
+		return prdz, gradient
 
 ## More Information (As Promised) ==============================================
 
@@ -579,8 +637,8 @@ Note - some vowels removed to ensure vim friendliness.
 
 
 ## Create the Independent Data
-train = N_Data(-500, 500, 500000)
-predL = N_Data(-500, 500, 1000, 'PW', 'LH')
+train = N_Data(-512, 512, 500000, 'Crate', 'rand')
+predL = N_Data(-512, 512, 1000, 'Crate', 'LH')
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
@@ -601,20 +659,26 @@ print
 
 ## Perform Interpolation on Predicted Points
 t0 = time.time()
-predL.AssignDep(trainLNInt(predL.points))
+
+prdzL, prdgL = trainLNInt(predL.points)
+predL.AssignDep(prdzL, prdgL)
+
 t1 = time.time()
 
+prdzW, prdgW = trainWNInt(predW.points)
+predW.AssignDep(prdzW, prdgW)
+
 t2 = time.time()
-predW.AssignDep(trainWNInt(predW.points))
+
+prdzC, prdgC = trainCNInt(predC.points)
+predC.AssignDep(prdzC, prdgC)
+
 t3 = time.time()
 
-t4 = time.time()
-predC.AssignDep(trainCNInt(predC.points))
-t5 = time.time()
+prdzH, prdgH = trainHNInt(predH.points)
+predH.AssignDep(prdzH, prdgH)
 
-t6 = time.time()
-predH.AssignDep(trainHNInt(predH.points))
-t7 = time.time()
+t4 = time.time()
 
 ## Plot All Results, Point Locations, and Error
 
@@ -629,9 +693,9 @@ predH.PlotAll('HN Predicted Data')
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
-print '-WN Interpolator:', (t3-t2)
-print '-CN Interpolator:', (t5-t4)
-print '-HN Interpolator:', (t7-t6)
+print '-WN Interpolator:', (t2-t1)
+print '-CN Interpolator:', (t3-t2)
+print '-HN Interpolator:', (t4-t3)
 print
 '''
 print 'Gradients'
@@ -651,7 +715,7 @@ with open("V4_Times.txt", "a") as efile:
 	efile.write("\n-HN Interpolator:")
 	efile.write(str(t7-t6))
 '''
-#plt.show()
+plt.show()
 
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
