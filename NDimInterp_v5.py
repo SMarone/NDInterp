@@ -124,6 +124,12 @@ class N_Data(object):
 			print
 			# Simple Plane Function
 			z = -5*x + 24*y
+		elif (self.funct == '5D'):
+			v = self.points[:,0]
+			w = self.points[:,1]
+			x = self.points[:,2]
+			y = self.points[:,3]
+			z = 9*(v**4) + w**3 - np.sin(np.pi*x) + np.cos(np.pi*(y**2))
 		else:
 			print 'Function type not found.'
 			raise SystemExit
@@ -225,6 +231,12 @@ class N_Data(object):
 					count +=1		
 		elif (self.funct == 'Plane'):
 			zc = -5*xc + 24*yc
+		elif (self.funct == '5D'):
+			vc = self.points[:,0]
+			wc = self.points[:,1]
+			xc = self.points[:,2]
+			yc = self.points[:,3]
+			zc = 9*(vc**4) + wc**3 - np.sin(np.pi*xc) + np.cos(np.pi*(yc**2))
 		else:
 			print 'No function available for comparison.'
 			print
@@ -260,7 +272,7 @@ class N_Data(object):
 		
 		if (np.all(self.gradient) != 0):
 			## Use complex step to check nearby points with found gradient
-			g = np.empty((len(vals),2), dtype='float')
+			g = np.empty((len(vals),self.dims-1), dtype='float')
 			xs = xc + (step*1j)
 			ys = yc + (step*1j)
 			if (self.funct == 'Crate'):
@@ -268,6 +280,8 @@ class N_Data(object):
 						(yc+47) * np.sin(np.sqrt(abs(xs/2 + yc + 47)))
 				zsy = -xc * np.sin(np.sqrt(abs(xc - ys - 47))) - \
 						(ys+47) * np.sin(np.sqrt(abs(xc/2 + ys + 47)))
+				g[:,0] = zsx.imag/ step
+				g[:,1] = zsy.imag/ step
 			elif (self.funct == 'PW'):
 				# Plot data against values from crate problem
 				zsx = np.empty(len(xs), dtype='complex')
@@ -288,11 +302,35 @@ class N_Data(object):
 						zsx[count] = 5*xs[i] + 6*yc[i]
 						zsy[count] = 5*xc[i] + 6*ys[i]
 						count +=1		
+				g[:,0] = zsx.imag/ step
+				g[:,1] = zsy.imag/ step
 			elif (self.funct == 'Plane'):
 				zsx = -5*xs + 24*yc
 				zsy = -5*xc + 24*ys
-			g[:,0] = zsx.imag/ step
-			g[:,1] = zsy.imag/ step
+				g[:,0] = zsx.imag/ step
+				g[:,1] = zsy.imag/ step
+			elif (self.funct == '5D'):
+				vc = self.points[:,0]
+				wc = self.points[:,1]
+				xc = self.points[:,2]
+				yc = self.points[:,3]
+				vs = vc + (step*1j)
+				ws = wc + (step*1j)
+				xs = xc + (step*1j)
+				ys = yc + (step*1j)
+				zsv = 9*(vs**4) + wc**3 - np.sin(np.pi*xc) + \
+										  np.cos(np.pi*(yc**2))
+				zsw = 9*(vc**4) + ws**3 - np.sin(np.pi*xc) + \
+										  np.cos(np.pi*(yc**2))
+				zsx = 9*(vc**4) + wc**3 - np.sin(np.pi*xs) + \
+										  np.cos(np.pi*(yc**2))
+				zsy = 9*(vc**4) + wc**3 - np.sin(np.pi*xc) + \
+										  np.cos(np.pi*(ys**2))
+				g[:,0] = zsv.imag/ step
+				g[:,1] = zsw.imag/ step
+				g[:,2] = zsx.imag/ step
+				g[:,3] = zsy.imag/ step
+
 			gerror = abs((g-self.gradient)/(g+0.000000000001)) * 100
 			gerror = np.sum(gerror, axis=1)/2
 			gavg = np.average(gerror)
@@ -403,7 +441,7 @@ class LNInterp(InterpBase):
 		for i in xrange(dims):
 		    da[i] = (r+1+i) % dims
 		    db[i] = (i-r-1) % dims
-				## Planar vectors need both dep and ind dimensions
+		## Planar vectors need both dep and ind dimensions
 		trnd = np.concatenate((self.tp[nloc,:] ,
 		                       self.tv[nloc].reshape(nppts,dims,1)),
 		                       axis=2)
@@ -661,18 +699,18 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Running Code ================================================================
 
-pp = PdfPages('ND_Interpolation_Plots.pdf')
+#pp = PdfPages('ND_Interpolation_Plots.pdf')
 
 ## Create the Independent Data
-train = N_Data(-500, 500, 500000, 'Plane', 'rand')
-predL = N_Data(-500, 500, 1000, 'Plane', 'LH')
+train = N_Data(-500, 500, 500000)
+predL = N_Data(-500, 500, 1000, 'PW', 'LH')
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
-train.PlotResults('Training Data', pp)
+#train.PlotResults('Training Data', pp)
 
 ## Setup Interpolation Methods around Training Points
 trainLNInt = LNInterp(train.points, train.values, NumLeaves=100)
@@ -713,10 +751,15 @@ print
 print '^---- Checking Results ----^'
 print
 
-predL.PlotAll('LN Predicted Data', pp)
-predW.PlotAll('WN Predicted Data', pp)
-predC.PlotAll('CN Predicted Data', pp)
-predH.PlotAll('HN Predicted Data', pp)
+#predL.PlotAll('LN Predicted Data', pp)
+#predW.PlotAll('WN Predicted Data', pp)
+#predC.PlotAll('CN Predicted Data', pp)
+#predH.PlotAll('HN Predicted Data', pp)
+
+predL.FindError('LN Predicted Data', 'None', False, False)
+predW.FindError('WN Predicted Data', 'None', False, False)
+predC.FindError('CN Predicted Data', 'None', False, False)
+predH.FindError('HN Predicted Data', 'None', False, False)
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
@@ -743,7 +786,7 @@ with open("V4_Times.txt", "a") as efile:
 	efile.write(str(t7-t6))
 '''
 
-pp.close()
+#pp.close()
 #plt.show()
 
 ## Side note: PrdPts are predicted points technically although it's not really 
