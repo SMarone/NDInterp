@@ -6,6 +6,7 @@ import time
 import math
 from mpl_toolkits.mplot3d import Axes3D
 import copy as cp
+from matplotlib.backends.backend_pdf import PdfPages
 
 ##   Written by Stephen Marone
 ##     Intern at the NASA GRC  
@@ -116,13 +117,20 @@ class N_Data(object):
 				else:
 					z[count] = 5*x[i] + 6*y[i]
 					count +=1
+		elif (self.funct == 'Plane'):
+			x = self.points[:,0]
+			y = self.points[:,1]
+			print 'Setting up Plane Function Dependents'
+			print
+			# Simple Plane Function
+			z = -5*x + 24*y
 		else:
 			print 'Function type not found.'
 			raise SystemExit
 		
 		self.values = z[:,np.newaxis]
 
-	def PlotResults(self, title):
+	def PlotResults(self, title, pltfile='None'):
 		## Plots the value results of a 3 dimensional problem
 
 		## Ensure points and values have been created
@@ -147,8 +155,11 @@ class N_Data(object):
 		ax.set_xlabel('X - Independent Variable')
 		ax.set_ylabel('Y - Independent Variable')
 		ax.set_zlabel('Z - Dependent Variable')
+		ax.set_zticklabels([])
+		if (pltfile != 'None'):
+			pltfile.savefig()
 
-	def PlotPoints(self, title):
+	def PlotPoints(self, title, pltfile='None'):
 		## Dim-1 plot of point locations for visualization
 
 		## Ensure points have been created
@@ -174,8 +185,11 @@ class N_Data(object):
 			ax.set_xlabel('X Value')
 			ax.set_ylabel('Y Value')
 			ax.set_zlabel('Z Value')
+		if (pltfile != 'None'):
+			pltfile.savefig()
 
-	def FindError(self, title, plot=True, check=False, step=0.00000001):
+	def FindError(self, title, pltfile='None', plot=True,
+				 check=False, step=0.00000001):
 		## Find and plot error of the found values
 		
 		## Ensure points and values have been created
@@ -209,6 +223,8 @@ class N_Data(object):
 				else:
 					zc[count] = 5*xc[i] + 6*yc[i]
 					count +=1		
+		elif (self.funct == 'Plane'):
+			zc = -5*xc + 24*yc
 		else:
 			print 'No function available for comparison.'
 			print
@@ -236,6 +252,8 @@ class N_Data(object):
 			plt.xlabel('Point Identifier')
 			plt.ylabel('Percent Error')
 			plt.ylim((0,((avg+0.00000000001)*2)))
+			if (pltfile != 'None'):
+				pltfile.savefig()
 
 		self.error = error
 		self.actualvalues = zc
@@ -270,6 +288,9 @@ class N_Data(object):
 						zsx[count] = 5*xs[i] + 6*yc[i]
 						zsy[count] = 5*xc[i] + 6*ys[i]
 						count +=1		
+			elif (self.funct == 'Plane'):
+				zsx = -5*xs + 24*yc
+				zsy = -5*xc + 24*ys
 			g[:,0] = zsx.imag/ step
 			g[:,1] = zsy.imag/ step
 			gerror = abs((g-self.gradient)/(g+0.000000000001)) * 100
@@ -295,14 +316,17 @@ class N_Data(object):
 				plt.xlabel('Point Identifier')
 				plt.ylabel('Percent Error')
 				plt.ylim((0,((gavg+0.00000000001)*2)))
+				if (pltfile != 'None'):
+					pltfile.savefig()
 	
 			self.gerror = gerror
 		print
 
-	def PlotAll(self,title, check=False):
-		self.PlotResults(title)
-		self.PlotPoints(title)
-		self.FindError(title, True, check)
+	def PlotAll(self, title, pltfile='None', erplot=True, 
+			   check=False,step=0.00000001):
+		self.PlotResults(title,pltfile)
+		self.PlotPoints(title,pltfile)
+		self.FindError(title,pltfile,erplot,check,step)
 
 # Interpolation Classes ========================================================
 
@@ -597,55 +621,58 @@ Dep - Dependent:   Dimensions which are a function of Ind
 
 		\/\/ Class Breakdown \/\/
 
-clss N_Data(object)
-df __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
-df AssignDep(self, val)
-df CreateDep(self)
-df PlotResults(self, title)
-df PlotPoints(self, title)
-df FindError(self, title, plot=True, check=False)
-df PlotAll(self, title, check=False)
+clss N_Data(object):
+	df __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
+	df AssignDep(self, values, gradient=[0]):
+	df CreateDep(self):
+	df PlotResults(self, title, pltfile='None'):
+	df PlotPoints(self, title, pltfile='None'):
+	df FindError(self, title, pltfile='None', plot=True,
+				 check=False, step=0.00000001):
+	df PlotAll(self, title, pltfile='None', erplot=True, 
+			   check=False,step=0.00000001):
 
-clss InterpBase(object)
-df __init__(self, TrnPts, TrnVals, NumLeaves=8)
-df FindNeighs(self, PrdPts, N=5)
-	rturn nppts, ndist, nloc
+clss InterpBase(object):
+	df __init__(self, TrnPts, TrnVals, NumLeaves=8):
+	df FindNeighs(self, PrdPts, N=5): 
+		rtrn prdz, gradient, nppts, ndist, nloc
 
-clss LNInterp(InterpBase)
-df __call__(self, PrdPts)
-	rturn prdz
+clss LNInterp(InterpBase):
+	df __call__(self, PrdPts):
+		rtrn prdz, gradient
 	
-clss WNInterp(InterpBase)
-df __call__(self, PrdPts, N=8, DistEff=5)
-	rturn prdz
+clss WNInterp(InterpBase):
+	df __call__(self, PrdPts, N=5, DistEff=5):
+		rtrn prdz, gradient
 
-clss CNInterp(InterpBase)
-df __call__(self, PrdPts, N=5, tension=0, bias=0)
-	rturn prdz
+clss CNInterp(InterpBase):
+	df __call__(self, PrdPts, N=5, tension=0, bias=0):
+		rtrn prdz, gradient
 
-clss HNInterp(InterpBase)
-df HermFunctArr(y, mu, tension, bias)
-	rturn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2])
-df __call__(self, PrdPts, N=8, tension=0, bias=0)
-	return prdz
-
+clss HNInterp(InterpBase):
+	df HermFunctArr(self, y, mu, dmu, tension, bias):
+		rtrn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2]), \
+				(dmu*(b0*y[:,1] + b1*m0 + b2*m1 + b3*y[:,2]))
+	df __call__(self, PrdPts, N=8, tension=0, bias=0):
+		rtrn prdz, gradient
 
 Note - some vowels removed to ensure vim friendliness.
 '''
 
 ## Running Code ================================================================
 
+pp = PdfPages('ND_Interpolation_Plots.pdf')
 
 ## Create the Independent Data
-train = N_Data(-512, 512, 500000, 'Crate', 'rand')
-predL = N_Data(-512, 512, 1000, 'Crate', 'LH')
+train = N_Data(-500, 500, 500000, 'Plane', 'rand')
+predL = N_Data(-500, 500, 1000, 'Plane', 'LH')
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
-train.PlotResults('Training Data')
+train.PlotResults('Training Data', pp)
 
 ## Setup Interpolation Methods around Training Points
 trainLNInt = LNInterp(train.points, train.values, NumLeaves=100)
@@ -686,10 +713,10 @@ print
 print '^---- Checking Results ----^'
 print
 
-predL.PlotAll('LN Predicted Data')
-predW.PlotAll('WN Predicted Data')
-predC.PlotAll('CN Predicted Data')
-predH.PlotAll('HN Predicted Data')
+predL.PlotAll('LN Predicted Data', pp)
+predW.PlotAll('WN Predicted Data', pp)
+predC.PlotAll('CN Predicted Data', pp)
+predH.PlotAll('HN Predicted Data', pp)
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
@@ -715,7 +742,9 @@ with open("V4_Times.txt", "a") as efile:
 	efile.write("\n-HN Interpolator:")
 	efile.write(str(t7-t6))
 '''
-plt.show()
+
+pp.close()
+#plt.show()
 
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
