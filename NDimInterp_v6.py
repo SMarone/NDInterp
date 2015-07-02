@@ -29,6 +29,68 @@ def suppress_stdout():
         finally:
             sys.stdout = old_stdout
 
+def Solve(points, funct):		
+	## Library of different problems to test interpolation
+	if (funct == 'Crate'):
+		## Egg Crate Function
+		x = points[:,0]
+		y = points[:,1]
+		z = -x * np.sin(np.sqrt(abs(x - y - 47))) - \
+		    (y+47) * np.sin(np.sqrt(abs(x/2 + y + 47)))
+	elif (funct == 'PW'):
+		## Piecewise Function with 3 Planes - made up
+		x = points[:,0]
+		y = points[:,1]
+		dtype = type(points[0,0])
+		z = np.empty(len(x), dtype=dtype)
+		count = 0
+		for i in range(len(x)):
+			if (x[i] > 0):
+				if (y[i] > 0):
+					z[count] = x[i] + 8*y[i]
+					count +=1
+				else:
+					z[count] = 5*x[i] + y[i]
+					count +=1
+			else:
+				z[count] = 5*x[i] + 6*y[i]
+				count +=1
+	elif (funct == 'Plane'):
+		## Simple Plane Function, made up
+		x = points[:,0]
+		y = points[:,1]
+		z = -5*x + 24*y
+	elif (funct == '5D2O'):
+		## Completely made up
+		v = points[:,0]
+		w = points[:,1]
+		x = points[:,2]
+		y = points[:,3]
+		z = 15*(v**2) - w - 4*x + 3*(y*y)
+		#z = 15*(v**2) - w - 4*x + np.sin(np.pi*(y*y))
+	elif (funct == '5D4O'):
+		## More bs stuff I made up
+		v = points[:,0]
+		w = points[:,1]
+		x = points[:,2]
+		y = points[:,3]
+		z = 9*(v**4) + w*w - 7*x + 2*(y*y)
+		#z = 9*(v**4) + w*w - np.sin(np.pi*x) + np.cos(np.pi*(y*y))
+	elif (funct == '2D3O'):
+		## 3rd Order Legendre Polynomial
+		x = points[:,0]/500. ## The 500s ensures it is the normal range 
+		z = 0.5*(5*(x**3)-3*x)*500
+	elif (funct == '2D5O'):
+		## 5rd Order Legendre Polynomial
+		x = points[:,0]/500. ## The 500s ensures it is the normal range 
+		z = (1/8.)*(63*(x**5) - 70*(x**3) + 15*x)*500
+	else:
+		print 'Function type not found.' #Srsly, read some instructions
+		print
+		return
+	
+	return z
+
 class N_Data(object):
 	## Main data type with N dimension.  Only needed if you want to use the 
 	# example functions, check for error, or plot.
@@ -50,6 +112,10 @@ class N_Data(object):
 		if (dtype == 'rand'):
 			self.points = np.random.rand(numpts,dims-1) * \
 										(maxi-mini) + mini
+			
+			if (dims == 2):
+				self.points = np.sort(self.points, axis=0)
+			'''
 			if (funct == 'PW'):
 				## This ensures points exist on discontinuities
 				self.points[0,0] = mini/2
@@ -63,7 +129,7 @@ class N_Data(object):
 				self.points[6,1] = mini
 				self.points[7,1] = maxi/2
 				self.points[8,1] = maxi
-
+			'''
 		elif (dtype == 'LH'):
 			points = np.zeros((numpts,dims-1), dtype="float")
 			for d in range(dims-1):
@@ -75,13 +141,17 @@ class N_Data(object):
 		elif (dtype == 'cart'):
 			if (dims == 3):
 				stp = (maxi-mini)/(np.sqrt(numpts)-1)
-				x = np.arange(mini,(maxi+stp),stp)
-				y = np.arange(mini,(maxi+stp),stp)
+				x = np.arange(mini,maxi,stp)
+				y = np.arange(mini,maxi,stp)
 				x, y = np.meshgrid(x, y)
 				self.points = np.transpose(np.array([x.flatten(), y.flatten()]))
+			elif (dims == 2):
+				stp = float(maxi-mini)/float(numpts+1)
+				x = np.arange((mini+stp),maxi,stp)
+				self.points = np.transpose(np.array([x.flatten()]))
 			else:
 				print 'Can not currently do cartesian in any dimension \
-						except for 3'
+						except for 2 and 3.'
 				raise SystemExit
 			'''
 			## Could not figure out why np would not do a meshgrid in N dims
@@ -96,62 +166,16 @@ class N_Data(object):
 
 	def AssignDep(self, values, gradient=[0]):
 		## Takes numpy array of values and stores inside the class variable
+		print '**Assigning Dependent Data**'
+		print
 		self.values = values[:,np.newaxis]
 		self.gradient=gradient
 
 	def CreateDep(self):
 		## This not only creates z but the data subtype as well
-		
-		if (self.funct == 'Crate'):
-  			x = self.points[:,0]
-			y = self.points[:,1]
-			print 'Setting up Crate Function Dependents'
-			print
-			## Egg Crate Function
-			z = -x * np.sin(np.sqrt(abs(x - y - 47))) - \
-			    (y+47) * np.sin(np.sqrt(abs(x/2 + y + 47)))
-		elif (self.funct == 'PW'):
-			x = self.points[:,0]
-			y = self.points[:,1]
-			print 'Setting up Piecewise Function Dependents'
-			print
-			z = np.empty(len(x))
-			## Piecewise Function with 3 Planes
-			count = 0
-			for i in range(len(x)):
-				if (x[i] > 0):
-					if (y[i] > 0):
-						z[count] = x[i] + 8*y[i]
-						count +=1
-					else:
-						z[count] = 5*x[i] + y[i]
-						count +=1
-				else:
-					z[count] = 5*x[i] + 6*y[i]
-					count +=1
-		elif (self.funct == 'Plane'):
-			x = self.points[:,0]
-			y = self.points[:,1]
-			print 'Setting up Plane Function Dependents'
-			print
-			# Simple Plane Function
-			z = -5*x + 24*y
-		elif (self.funct == '5D'):
-			v = self.points[:,0]
-			w = self.points[:,1]
-			x = self.points[:,2]
-			y = self.points[:,3]
-			z = 9*(v**4) + w**3 - np.sin(np.pi*x) + np.cos(np.pi*(y**2))
-		elif (self.funct == '2D3O'):
-			x = self.points[:,0]
-			z = 7*(x**3) - 2
-		elif (self.funct == '2D5O'):
-			x = self.points[:,0]
-			z = 3*(x**5) + 4*(x*x) + 8
-		else:
-			print 'Function type not found.'
-			raise SystemExit
-		
+		print '**Creating Dependent Data from Problem Library**'
+		print
+		z = Solve(self.points,self.funct)	
 		self.values = z[:,np.newaxis]
 
 	def PlotResults(self, title, pltfile='None'):
@@ -164,22 +188,41 @@ class N_Data(object):
 			print 'Values have not been set.'
 			return
 
-		x = self.points[:,0]
-		y = self.points[:,1]
 		fig = plt.figure()
-		ax = fig.gca(projection='3d')
-		surf = ax.tricontour(x.flatten(), y.flatten(), 
-							 self.values.real.flatten(), 
-							 100, rstride=1, cstride=1, 
-							 cmap=cm.coolwarm, linewidth=0, 
-							 antialiased=False)
-		fig.colorbar(surf, shrink=0.5, aspect=5)
-		fig.suptitle('%s Results' % title, 
-					 fontsize=14, fontweight='bold')
-		ax.set_xlabel('X - Independent Variable')
-		ax.set_ylabel('Y - Independent Variable')
-		ax.set_zlabel('Z - Dependent Variable')
-		ax.set_zticklabels([])
+		if (self.dims == 3):
+			x = self.points[:,0]
+			y = self.points[:,1]
+			ax = fig.gca(projection='3d')
+			surf = ax.tricontour(x.flatten(), y.flatten(), 
+								 self.values.real.flatten(), 
+								 500, rstride=1, cstride=1, 
+								 cmap=cm.coolwarm, linewidth=0, 
+								 antialiased=False)
+			fig.colorbar(surf, shrink=0.5, aspect=5)
+			fig.suptitle('%s Results' % title, 
+						 fontsize=14, fontweight='bold')
+			ax.set_xlabel('X - Independent Variable')
+			ax.set_ylabel('Y - Independent Variable')
+			ax.set_zlabel('Z - Dependent Variable')
+			ax.set_zticklabels([])
+			if (self.funct == 'PW'):
+				ax.set_zlim([-5000,5000])
+			elif (self.funct == 'Crate'):
+				ax.set_zlim([-1000,1000])
+			elif (self.funct == 'Plane'):
+				ax.set_zlim([-15000,15000])
+		elif (self.dims == 2):
+			x = self.points[:,0].flatten()
+			y = self.values[:,0].flatten()
+			plt.plot(x, y, 'ko-')
+			fig.suptitle('%s Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(min(x), max(x))
+		else:
+			print 'Unable to plot this dimension of points.'
+			print
 		if (pltfile != 'None'):
 			pltfile.savefig()
 
@@ -193,14 +236,15 @@ class N_Data(object):
 			print 'Points have not been set.'
 			return
 
-		fig = plt.figure()
 		if (self.dims == 3):
+			fig = plt.figure()
 			plt.scatter(self.points[:,0], self.points[:,1])
 			fig.suptitle('%s Point Locations' % title, 
 							fontsize=14, fontweight='bold')
 			plt.xlabel('X Value')
 			plt.ylabel('Y Value')
 		elif (self.dims == 4):
+			fig = plt.figure()
 			ax = fig.gca(projection='3d')
 			ax.scatter(self.points[:,0], self.points[:,1], 
 						self.points[:,2], c=c, marker=m)
@@ -209,6 +253,12 @@ class N_Data(object):
 			ax.set_xlabel('X Value')
 			ax.set_ylabel('Y Value')
 			ax.set_zlabel('Z Value')
+		elif (self.dims == 2):
+			return
+		else:
+			print 'Unable to plot this dimension of points.'
+			print
+			return
 		if (pltfile != 'None'):
 			pltfile.savefig()
 
@@ -224,49 +274,9 @@ class N_Data(object):
 			return
 
 		vals = self.values.flatten()
-		xc = self.points[:,0]
 		loc = 1+np.arange(len(vals), dtype='float')
+		zc = Solve(self.points,self.funct)	
 		
-		if (self.funct == 'Crate'):
-			yc = self.points[:,1]
-			zc = -xc * np.sin(np.sqrt(abs(xc - yc - 47))) - \
-					(yc+47) * np.sin(np.sqrt(abs(xc/2 + yc + 47)))
-		elif (self.funct == 'PW'):
-			# Plot data against values from crate problem
-			yc = self.points[:,1]
-			zc = np.empty(len(xc))
-			# Make Piecewise Function with 3 Planes
-			count = 0
-			for i in range(len(xc)):
-				if (xc[i] > 0):
-					if (yc[i] > 0):
-						zc[count] = xc[i] + 8*yc[i]
-						count +=1
-					else:
-						zc[count] = 5*xc[i] + yc[i]
-						count +=1
-				else:
-					zc[count] = 5*xc[i] + 6*yc[i]
-					count +=1		
-		elif (self.funct == 'Plane'):
-			yc = self.points[:,1]
-			zc = -5*xc + 24*yc
-		elif (self.funct == '5D'):
-			vc = self.points[:,0]
-			wc = self.points[:,1]
-			xc = self.points[:,2]
-			yc = self.points[:,3]
-			zc = 9*(vc**4) + wc**3 - np.sin(np.pi*xc) + np.cos(np.pi*(yc**2))
-		elif (self.funct == '2D3O'):
-			xc = self.points[:,0]
-			zc = 7*(xc**3) - 2
-		elif (self.funct == '2D5O'):
-			xc = self.points[:,0]
-			zc = 3*(xc**5) + 4*(xc*xc) + 8
-		else:
-			print 'No function available for comparison.'
-			print
-			return
 		error = abs((zc-vals)/(zc+0.000000000001)) * 100
 		avg = np.average(error)
 		
@@ -298,67 +308,15 @@ class N_Data(object):
 		if (np.all(self.gradient) != 0):
 			## Use complex step to check nearby points with found gradient
 			g = np.empty((len(vals),self.dims-1), dtype='float')
-			xs = xc + (step*1j)
-			if (self.funct == 'Crate'):
-				ys = yc + (step*1j)
-				zsx = -xs * np.sin(np.sqrt(abs(xs - yc - 47))) - \
-						(yc+47) * np.sin(np.sqrt(abs(xs/2 + yc + 47)))
-				zsy = -xc * np.sin(np.sqrt(abs(xc - ys - 47))) - \
-						(ys+47) * np.sin(np.sqrt(abs(xc/2 + ys + 47)))
-				g[:,0] = zsx.imag/ step
-				g[:,1] = zsy.imag/ step
-			elif (self.funct == 'PW'):
-				# Plot data against values from crate problem
-				ys = yc + (step*1j)
-				zsx = np.empty(len(xs), dtype='complex')
-				zsy = np.empty(len(xs), dtype='complex')
-				# Make Piecewise Function with 3 Planes
-				count = 0
-				for i in range(len(xs)):
-					if (xs[i] > 0):
-						if (ys[i] > 0):
-							zsx[count] = xs[i] + 8*yc[i]
-							zsy[count] = xc[i] + 8*ys[i]
-							count +=1
-						else:
-							zsx[count] = 5*xs[i] + yc[i]
-							zsy[count] = 5*xc[i] + ys[i]
-							count +=1
-					else:
-						zsx[count] = 5*xs[i] + 6*yc[i]
-						zsy[count] = 5*xc[i] + 6*ys[i]
-						count +=1		
-				g[:,0] = zsx.imag/ step
-				g[:,1] = zsy.imag/ step
-			elif (self.funct == 'Plane'):
-				ys = yc + (step*1j)
-				zsx = -5*xs + 24*yc
-				zsy = -5*xc + 24*ys
-				g[:,0] = zsx.imag/ step
-				g[:,1] = zsy.imag/ step
-			elif (self.funct == '5D'):
-				vs = vc + (step*1j)
-				ws = wc + (step*1j)
-				xs = xc + (step*1j)
-				ys = yc + (step*1j)
-				zsv = 9*(vs**4) + wc**3 - np.sin(np.pi*xc) + \
-										  np.cos(np.pi*(yc**2))
-				zsw = 9*(vc**4) + ws**3 - np.sin(np.pi*xc) + \
-										  np.cos(np.pi*(yc**2))
-				zsx = 9*(vc**4) + wc**3 - np.sin(np.pi*xs) + \
-										  np.cos(np.pi*(yc**2))
-				zsy = 9*(vc**4) + wc**3 - np.sin(np.pi*xc) + \
-										  np.cos(np.pi*(ys**2))
-				g[:,0] = zsv.imag/ step
-				g[:,1] = zsw.imag/ step
-				g[:,2] = zsx.imag/ step
-				g[:,3] = zsy.imag/ step
-			elif (self.funct == '2D3O'):
-				zs = 7*(xs**3) - 2
-				g[:,0] = zs.imag/ step
-			elif (self.funct == '2D5O'):
-				zs = 3*(xs**5) + 4*(xs*xs) + 8
-				g[:,0] = zs.imag/ step
+			points = np.zeros((len(vals),self.dims-1), dtype='complex')
+			points += self.points
+
+			for D in range(self.dims-1):
+				points[:,D] += (step*1j)
+				zs = Solve(points,self.funct)
+				g[:,D] = zs.imag/ step
+				points[:,D] = points[:,D].real
+
 			gerror = abs((g-self.gradient)/(g+0.000000000001)) * 100
 			gerror = np.sum(gerror, axis=1)/2
 			gavg = np.average(gerror)
@@ -367,7 +325,7 @@ class N_Data(object):
 				for i in range(len(error)):
 					if (gerror[i] > 100):
 						print '**High Percent Error found of', gerror[i], '**'
-						print '-Location:', self.point[i,:]
+						print '-Location:', points[i,:]
 						print '-Calculated Value:', g[i,:]
 						print '-Found Value:', self.gradient[i,:] 
 			
@@ -375,13 +333,37 @@ class N_Data(object):
 			print '-Max Actual Gradient Percent Error:', np.max(gerror)
 	
 			if plot:
+				if (self.dims == 2):
+					col = 1
+					rows = 1
+				else:
+					col = 2
+					rows = int(self.dims/2)
+				gbfig, gbax = plt.subplots(col,rows)
+				gbfig.suptitle('%s Gradient wrt Independent' % title, 
+							  fontsize=14, fontweight='bold')
+				gbax = np.reshape(gbax,((self.dims-1)))
+				for D in range(self.dims-1):
+					ming = min(g[:,D])
+					ming -= 0.05*abs(ming)
+					maxg = max(g[:,D])
+					maxg += 0.05*abs(ming)
+					gbax[D].plot(points[:,D].real,g[:,D],'bo',
+								 points[:,D].real,self.gradient[:,D],'rx')
+					gbax[D].set_xlabel('Independent %s Value' % (D+1))
+					gbax[D].set_ylabel('Gradient Value')
+					gbax[D].set_ylim([ming,maxg])
+				gbax[D].legend(['Complex Step in Function','Interpolation'],
+						loc=4, prop={'size':8})
+				if (pltfile != 'None'):
+					pltfile.savefig()
 				gfig = plt.figure()
 				plt.plot(loc, gerror, 'k')
-				gfig.suptitle('%s Gradient Error Per Point' % title, 
+				gfig.suptitle('%s Actual Gradient Error Per Point' % title, 
 							  fontsize=14, fontweight='bold')
 				plt.xlabel('Point Identifier')
 				plt.ylabel('Percent Error')
-				plt.ylim((0,((gavg+0.00000000001)*2)))
+				plt.ylim((0,((gavg+0.0000000000001)*2)))
 				if (pltfile != 'None'):
 					pltfile.savefig()
 	
@@ -390,7 +372,7 @@ class N_Data(object):
 
 	def CheckGrad(self, title, Interp, itype, pltfile='None', plot=True,
 				 check=False, step=0.00000001, N=5, DistEff=3, 
-				 tension=0, bias=0):
+				 tension=0, bias=0, tight=False):
 		loc = 1+np.arange(len(self.values), dtype='float')
 		## Find and plot error of the found values
 		
@@ -413,11 +395,11 @@ class N_Data(object):
 				elif (itype == 'CN'):
 					zi, junk = Interp(PrdiPts, N)
 				elif (itype == 'HN'):
-					zi, junk = Interp(PrdiPts, N, tension, bias)
+					zi, junk = Interp(PrdiPts, N, tension, bias, tight)
 
 			gradi[:,D] = zi.imag/ step
 
-		gerror = abs((gradi-self.gradient)/(gradi+0.000000000001)) * 100
+		gerror = abs((gradi-self.gradient)/(gradi+0.0000000000001)) * 100
 		gerror = np.sum(gerror, axis=1)/(self.dims-1)
 		gavg = np.average(gerror)
 
@@ -425,7 +407,7 @@ class N_Data(object):
 			for i in range(len(error)):
 				if (gerror[i] > 100):
 					print '**High Percent Error found of', gerror[i], '**'
-					print '-Location:', PrdPts[i,:]
+					print '-Location:', PrdiPts[i,:]
 					print '-Calculated Value:', gradi[i,:]
 					print '-Found Value:', self.gradient[i,:] 
 			
@@ -435,13 +417,37 @@ class N_Data(object):
 		print
 
 		if plot:
+			if (self.dims == 2):
+				col = 1
+				rows = 1
+			else:
+				col = 2
+				rows = int(self.dims/2)
+			gbfig, gbax = plt.subplots(col,rows)
+			gbfig.suptitle('%s Gradient wrt Independent' % title, 
+						  fontsize=14, fontweight='bold')
+			gbax = np.reshape(gbax,((self.dims-1)))
+			for D in range(self.dims-1):
+				ming = min(gradi[:,D])
+				ming -= 0.05*abs(ming)
+				maxg = max(gradi[:,D])
+				maxg += 0.05*abs(ming)
+				gbax[D].plot(PrdiPts[:,D].real,gradi[:,D],'bo',
+							 PrdiPts[:,D].real,self.gradient[:,D],'rx')
+				gbax[D].set_xlabel('Independent %s Value' % (D+1))
+				gbax[D].set_ylabel('Gradient Value')
+				gbax[D].set_ylim([ming,maxg])
+			gbax[D].legend(['Complex Step in Interp.','Interpolation'], 
+					loc=4, prop={'size':8})
+			if (pltfile != 'None'):
+				pltfile.savefig()
 			gfig = plt.figure()
 			plt.plot(loc, gerror, 'k')
 			gfig.suptitle('%s Gradient Error Per Point' % title, 
 						  fontsize=14, fontweight='bold')
 			plt.xlabel('Point Identifier')
 			plt.ylabel('Percent Error')
-			plt.ylim((0,((gavg+0.00000000001)*2)))
+			plt.ylim((0,((gavg+0.0000000000001)*2)))
 			if (pltfile != 'None'):
 				pltfile.savefig()
 	
@@ -449,12 +455,12 @@ class N_Data(object):
 		
 	def PlotAll(self, title, Interp, itype, pltfile='None', erplot=True, 
 			   check=False, step=0.00000001, neighs=5, 
-			   DistEff=3, tension=0, bias=0):
+			   DistEff=3, tension=0, bias=0, tight=False):
 		self.PlotResults(title,pltfile)
 		self.PlotPoints(title,pltfile)
 		self.FindError(title,pltfile,erplot,check,step)
 		self.CheckGrad(title,Interp,itype,pltfile,erplot,check,step,
-					   neighs,DistEff,tension,bias)
+					   neighs,DistEff,tension,bias,tight)
 
 
 # Interpolation Classes ========================================================
@@ -493,7 +499,7 @@ class InterpBase(object):
 				print 'The problem has too few training points for'
 				print 'its number of dimensions.'
 				raise SystemExit
-		
+
 		print 'Interpolation Input Values'
 		print '-KDTree Leaves:', numleaves
 		print '-Number of Neighbors per Predicted Point:', N
@@ -501,7 +507,7 @@ class InterpBase(object):
 		print '-Number of Predicted Points:', nppts
 		print
 		## Make into training data into a Tree
-		leavesz = math.ceil(numtrn/numleaves)
+		leavesz = math.ceil(numtrn/(numleaves+0.00000000000001))
 		KData = spatial.KDTree(self.tp,leafsize=leavesz)
 
 		## KData query takes (data, #ofneighbors) to determine closest 
@@ -523,46 +529,56 @@ class LNInterp(InterpBase):
 		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
-		## Extra Inputs for Finding the normal are found below
 		
-		## Number of row vectors needed always dimensions - 1
-		r = np.arange(dims-1, dtype="int")
-		
-		## Diagonal counters are found here to speed up finding each normal
-		da = np.zeros((dims, dims-1), dtype="int")
-		db = np.zeros((dims, dims-1), dtype="int")
-		for i in xrange(dims):
-		    da[i] = (r+1+i) % dims
-		    db[i] = (i-r-1) % dims
-		## Planar vectors need both dep and ind dimensions
-		trnd = np.concatenate((self.tp[nloc,:] ,
-		                       self.tv[nloc].reshape(nppts,dims,1)),
-		                       axis=2)
-		## Set the prddata to a temporary array so it has the same
-		# dimensions as the training data with z as 0 for now
-		prdtemp = np.concatenate((PrdPts, np.zeros((nppts,1),dtype='float')), 1)
-		
-		nvect = np.empty((nppts,(dims-1),dims), dtype='float')
-		for n in range(dims-1): ## Go through each neighbor
-		    ## Creates array[neighbor, dimension] from NN results
-		    nvect[:,n,:] = trnd[:,(n+1),:] - trnd[:,n,:]
-		
-		## It is known that found array will be size [dims-1, dims]
-		# and can be used below to in an exterior product.
-		normal = np.prod(nvect[:,r,da], axis=2) - \
-				 np.prod(nvect[:,r,db], axis=2)
-		
-		## The pc is the constant of the n dimensional plane.
-		## It uses the point which is from the closest neighbor
-		pc = np.einsum('ij, ij->i',trnd[:,0,:],normal)
-		
-		if (np.any(normal[-1]) == 0):
-		    print 'Error, dependent variable has infinite answers.'
-		    return prdz, gradient
-		
-		gradient = -normal[:,:-1]/normal[:,-1:]
-		
-		prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)/-normal[:,-1]
+		## Need to ensure there are enough dimensions to find the normal with
+		if (dims > 2):
+			## Extra Inputs for Finding the normal are found below
+			## Number of row vectors needed always dimensions - 1
+			r = np.arange(dims-1, dtype="int")
+			
+			## Diagonal counters are found here to speed up finding each normal
+			da = np.zeros((dims, dims-1), dtype="int")
+			db = np.zeros((dims, dims-1), dtype="int")
+			for i in xrange(dims):
+			    da[i] = (r+1+i) % dims
+			    db[i] = (i-r-1) % dims
+			## Planar vectors need both dep and ind dimensions
+			trnd = np.concatenate((self.tp[nloc,:] ,
+			                       self.tv[nloc].reshape(nppts,dims,1)),
+			                       axis=2)
+			## Set the prddata to a temporary array so it has the same
+			# dimensions as the training data with z as 0 for now
+			prdtemp = np.concatenate((PrdPts, \
+									np.zeros((nppts,1),dtype='float')), 1)
+			
+			nvect = np.empty((nppts,(dims-1),dims), dtype='float')
+			for n in range(dims-1): ## Go through each neighbor
+			    ## Creates array[neighbor, dimension] from NN results
+			    nvect[:,n,:] = trnd[:,(n+1),:] - trnd[:,n,:]
+			
+			## Nvec used below to in an exterior product.
+			normal = np.prod(nvect[:,r,da], axis=2) - \
+					 np.prod(nvect[:,r,db], axis=2)
+			
+			## The pc is the constant of the n dimensional plane.
+			## It uses the point which is from the closest neighbor
+			pc = np.einsum('ij, ij->i',trnd[:,0,:],normal)
+			
+			if (np.any(normal[-1]) == 0):
+			    print 'Error, dependent variable has infinite answers.'
+			    return prdz, gradient
+			
+			gradient = -normal[:,:-1]/normal[:,-1:]
+			
+			prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)/-normal[:,-1]
+		else:
+			## Need to find a tangent instead of a normal, y=mx+b
+			m = (self.tv[nloc[:,1],0] - self.tv[nloc[:,0],0])/ \
+				(self.tp[nloc[:,1],0] - self.tp[nloc[:,0],0])
+			b = self.tv[nloc[:,0],0] - (m * self.tp[nloc[:,0],0])
+			prdz = (m * PrdPts[:,0]) + b
+			gradient[:,0] = m
+
 		return prdz, gradient
 	
 class WNInterp(InterpBase):
@@ -577,20 +593,21 @@ class WNInterp(InterpBase):
 		print
 
 		## Setup problem
+		vals = 0
 		pdims = self.dims - 1
 		dimdiff = np.subtract(PrdPts.reshape(nppts,1,pdims), self.tp[nloc,:])
 		for D in range(pdims):
 			if (PrdPts[0,D].imag > 0):
 				## KD Tree ignores imaginary part, muse redo ndist if complex 
 				ndist = np.sqrt(np.sum((dimdiff**2), axis=2))
-
+				vals += 0j
 		## Find the weighted neighbors per defined formula for distance effect
 		part = ndist**DistEff
 		sd = np.sum(1/part, axis=1)
-		vals = self.tv[nloc]
+		vals += self.tv[nloc] 
 		wt = np.sum(vals[:,:,0]/part, axis=1)  
 		prdz = wt/sd
-
+		
 		## Calculate necessaties for gradient
 		dsd = np.sum((dimdiff/(ndist**(DistEff+2)).reshape(nppts,N,1)),
 						axis=1).reshape(nppts,1,pdims)
@@ -601,19 +618,8 @@ class WNInterp(InterpBase):
 		
 		## Solve for gradient
 		const = (DistEff/(sd*sd)).reshape(nppts,1)
-		gradient = const*np.sum((vals/(ndist**DistEff)) * \
-						   (dsd-(sumdist*dimdiff/(ndist*ndist))), axis=1)
-		'''
-		for t in range(nppts):
-			print 'Loc:', PrdPts[t,:]
-			print 'Neigh Locs:', self.tp[nloc[t,:]]
-			print 'Neigh Dists:',ndist[t,:,:]
-			print 'Weights:', ((1/part[t,:])/sd[t])
-			print 'Neigh Vals:', self.tv[nloc[t]] 
-			print 'Vals:', prdz[t]
-			print 'Gradient', gradient[t,:]
-			print
-		'''
+		gradient = (const*np.sum((vals/(ndist**DistEff)) * \
+				(dsd-(sumdist*dimdiff/(ndist*ndist))), axis=1))
 		return prdz, gradient
 
 class CNInterp(InterpBase):
@@ -658,7 +664,7 @@ class CNInterp(InterpBase):
 			
 			ddiff = 1/(orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])
 			diff = -podiff[anppts,(cnd-1)] * ddiff
-			       
+			
 			mu2 = (1-np.cos(np.pi*diff))/2
 			tprdz += zu * mu2 + zl * (1-mu2)
 			gradient[:,D] = (np.pi/2)*(zu-zl)*ddiff*np.sin(np.pi*diff.real)/(self.dims-1) 
@@ -678,9 +684,8 @@ class HNInterp(InterpBase):
 	
 		m0  = (y[:,1]-y[:,0])*(1+bias)*(1-tension)/2
 		m0 += (y[:,2]-y[:,1])*(1-bias)*(1-tension)/2
-		m1  = (y[:,2]-y[:,1])*(1+bias)*(1+tension)/2
-		m1 += (y[:,3]-y[:,2])*(1-bias)*(1+tension)/2
-		#m00 = m0 * ((1+bias)+(1-bias))*(1-tension)/2
+		m1  = (y[:,2]-y[:,1])*(1+bias)*(1-tension)/2
+		m1 += (y[:,3]-y[:,2])*(1-bias)*(1-tension)/2
 
 
 		a0 =  2*mu3 - 3*mu2 + 1
@@ -696,10 +701,22 @@ class HNInterp(InterpBase):
 		return (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2]), \
 				((dmu*(b0*y[:,1]+b1*m0+b2*m1+b3*y[:,2]))/(self.dims-1)).real
 	
-	def __call__(self, PrdPts, N=5, tension=0, bias=0):
+	def __call__(self, PrdPts, N=5, tension=0, bias=0, tight=False):
 		## Traindata has n dimensions, prddata has n-1 dimensions because last
 		# dimension is the dependent one we are solving for.  
 		## N neighbors will be found but only 4 will be used per dimension
+
+		if tight:
+			## Added this because tight works much better with smaller problems
+			# but very badly with larger problems
+			u = 0
+			l = 1
+		else:
+			u = 1
+			l = 2
+
+		if (N < 5):
+			N = 5
 
 		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
 
@@ -737,8 +754,9 @@ class HNInterp(InterpBase):
 			cnd[cnd >= (N-1)] = N-2
 		
 			## Find location of value in min and max of neighvals to be used
-			ddiff = 1/(orgneighs[anppts,(cnd+1),D]-orgneighs[anppts,(cnd-2),D])
-			diff = -podiff[anppts,(cnd-2)] * ddiff 
+			ddiff = 1/(orgneighs[anppts,(cnd+u),D]-orgneighs[anppts,(cnd-l),D])
+			diff = -podiff[anppts,(cnd-l)] * ddiff 
+
 			for n in range(4):
 				## Only need 4 inputs.  Would like to remove this sometime
 				y[:,n] = orgneighs[anppts,(cnd-2+n),-1]
@@ -746,6 +764,7 @@ class HNInterp(InterpBase):
 					self.HermFunctArr(y,diff,ddiff,tension,bias)
 			tprdz += t1
 			#tprdz = self.HermFunctArr(orgneighs[anppts,np.array([np.arange((cnd-2),N),]*nppts),-1], diff,tension,bias)
+			## Could integrated a weighting here by distance of diff from 0.5
 
 		prdz = tprdz/(D+1)
 		return prdz, gradient
@@ -815,35 +834,57 @@ Note - some vowels removed to ensure vim friendliness.
 step = 0.00000001
 
 ## Problem Inputs and put into simpler variables
-problem = 'PW'
-dimensions = 3
-neighbors = 5
-DistanceEffect = 3
+minimum = -500
+maximum = 500
+trnpoints = 50000  # Minimum of 5 because of Hermite limitations
+prdpoints = 1000
+trndist = 'rand' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
+prddist = 'LH' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
+problem = 'Crate'
+neighbors = 20 # Default of about 1/1000 trnpoints, min 2
+DistanceEffect = 2
 tension = 0
 bias = 0
+NumLeaves = 100
+tight = True # Default algorithm had only true, change if neighs << trnpoints
+
+## Organize inputs
+if ((problem == '2D3O') or (problem == '2D5O')):
+	dimensions = 2
+elif ((problem == 'Plane') or (problem == 'PW') or (problem == 'Crate')):
+	dimensions = 3
+elif ((problem == '5D2O') or (problem == '5D4O')):
+	dimensions = 5
+else:
+	print 'Problem type %s does not exist.' % problem
+	raise SystemExit
 pr = problem
 dim = dimensions
 N = neighbors
 DE = DistanceEffect
 t = tension
 b = bias
+tt = tight
+erplot = False
+AbyT = 1
 
 ## Create the Independent Data
-train = N_Data(-500, 500, 50000, pr, 'rand', dim)
-predL = N_Data(-500, 500, 1000, pr, 'LH', dim)
+train = N_Data(minimum, maximum, trnpoints, pr, trndist, dim)
+actul = N_Data(minimum, maximum, (trnpoints*AbyT), pr, trndist, dim)
+predL = N_Data(minimum, maximum, prdpoints, pr, prddist, dim)
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
-#train.PlotResults('Training Data', pp)
+actul.CreateDep()
 
 ## Setup Interpolation Methods around Training Points
-trainLNInt = LNInterp(train.points, train.values, NumLeaves=100)
-trainWNInt = WNInterp(train.points, train.values, NumLeaves=100)
-trainCNInt = CNInterp(train.points, train.values, NumLeaves=100)
-trainHNInt = HNInterp(train.points, train.values, NumLeaves=100)
+trainLNInt = LNInterp(train.points, train.values, NumLeaves)
+trainWNInt = WNInterp(train.points, train.values, NumLeaves)
+trainCNInt = CNInterp(train.points, train.values, NumLeaves)
+trainHNInt = HNInterp(train.points, train.values, NumLeaves)
 
 print
 print '^---- Running Interpolation Code ----^'
@@ -867,7 +908,7 @@ predC.AssignDep(prdzC, prdgC)
 
 t3 = time.time()
 
-prdzH, prdgH = trainHNInt(predH.points, N, t, b)
+prdzH, prdgH = trainHNInt(predH.points, N, t, b, tt)
 
 predH.AssignDep(prdzH, prdgH)
 
@@ -880,28 +921,148 @@ print '^---- Checking Results ----^'
 print
 
 
-#predL.FindError('LN Predicted Data')
-#predW.FindError('WN Predicted Data')
-#predC.FindError('CN Predicted Data')
-#predH.FindError('HN Predicted Data')
 
-predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
-		pltfile='None', erplot=True, check=False, 
-		step=step, neighs=N, DistEff=DE, tension=t, bias=b)
-predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
-		pltfile='None', erplot=True, check=False,
-		step=step, neighs=N, DistEff=DE, tension=t, bias=b)
-predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
-		pltfile='None', erplot=True, check=False,
-		step=step, neighs=N, DistEff=DE, tension=t, bias=b)
-predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
-		pltfile='None', erplot=True, check=False,
-		step=step, neighs=N, DistEff=DE, tension=t, bias=b)
+if (dimensions == 3):
 
-#predL.FindError('LN Predicted Data', 'None', False, False)
-#predW.FindError('WN Predicted Data', 'None', False, False)
-#predC.FindError('CN Predicted Data', 'None', False, False)
-#predH.FindError('HN Predicted Data', 'None', False, False)
+	#actul.PlotResults('Actual Data')
+	#train.PlotResults('Training Data', pp)
+
+	predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
+			pltfile='None', erplot=erplot, check=False, 
+			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+	predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
+			pltfile='None', erplot=erplot, check=False,
+			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+	predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
+			pltfile='None', erplot=erplot, check=False,
+			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+	predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
+			pltfile='None', erplot=erplot, check=False,
+			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+
+elif (dimensions == 2):
+	
+	fig = plt.figure()
+
+	Ax = actul.points[:,0].flatten()
+	Ay = actul.values[:,0].flatten()
+	Tx = train.points[:,0].flatten()
+	Ty = train.values[:,0].flatten()
+	Lx = predL.points[:,0].flatten()
+	Ly = predL.values[:,0].flatten()
+	Wx = predW.points[:,0].flatten()
+	Wy = predW.values[:,0].flatten()
+	Cx = predC.points[:,0].flatten().real
+	Cy = predC.values[:,0].flatten().real
+	Hx = predH.points[:,0].flatten().real
+	Hy = predH.values[:,0].flatten().real
+	xmi = np.min(Ax)
+	xma = np.max(Ax)
+	ymi = np.min(Ay)
+	yma = np.max(Ay)
+	plt.plot(Ax, Ay, 'k-', Tx, Ty, 'bo', Lx, Ly, 'y--',Wx, Wy, 'g--',Cx, Cy, 'c-.',Hx, Hy, 'r-.')
+	fig.suptitle('Predicted Data Results', 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Training', 'Linear', 'Weighted', 'Cosine', 'Hermite'], loc=4, prop={'size':10})
+
+	fig = plt.figure()
+	title = 'Linear'
+	
+	Px = predL.points[:,0].flatten()
+	Py = predL.values[:,0].flatten()
+	plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+	fig.suptitle('%s Data Results' % title, 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+	
+	predL.FindError('LN Predicted Data', 'None', erplot, False)
+	predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+
+	fig = plt.figure()
+	title = 'Weighted'
+	
+	Px = predW.points[:,0].flatten()
+	Py = predW.values[:,0].flatten()
+	plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+	fig.suptitle('%s Data Results' % title, 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+	
+	predW.FindError('WN Predicted Data', 'None', erplot, False)
+	predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+
+	fig = plt.figure()
+	title = 'Cosine'
+	
+	Px = predC.points[:,0].flatten().real
+	Py = predC.values[:,0].flatten().real
+	plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+	fig.suptitle('%s Data Results' % title, 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+	
+	predC.FindError('CN Predicted Data', 'None', erplot, False)
+	predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+
+	fig = plt.figure()
+	title = 'Hermite'
+	
+	Px = predH.points[:,0].flatten().real
+	Py = predH.values[:,0].flatten().real
+	plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+	fig.suptitle('%s Data Results' % title, 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+
+	predH.FindError('HN Predicted Data', 'None', erplot, False)
+	predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+
+else:
+	
+	predL.FindError('LN Predicted Data', 'None', erplot, False)
+	predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	predW.FindError('WN Predicted Data', 'None', erplot, False)
+	predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	predC.FindError('CN Predicted Data', 'None', erplot, False)
+	predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	predH.FindError('HN Predicted Data', 'None', erplot, False)
+	predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
@@ -910,12 +1071,6 @@ print '-CN Interpolator:', (t3-t2)
 print '-HN Interpolator:', (t4-t3)
 print
 '''
-print 'Gradients'
-print trainLNInt.gradient
-print trainWNInt.gradient
-print trainCNInt.gradient
-print trainHNInt.gradient
-
 with open("V4_Times.txt", "a") as efile:
 	efile.write("\nRun Times\n")
 	efile.write("\n-LN Interpolator:")
