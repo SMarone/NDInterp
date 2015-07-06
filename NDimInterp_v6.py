@@ -17,7 +17,7 @@ import sys, os
 ## This is an n-dimensional interpolation code.  More information can be found
 # at the end of the code along with the lines which run it.
 
-# Setting up the original problem ==============================================
+# Set Up Original Problem ======================================================
  
 @contextmanager
 def suppress_stdout():
@@ -250,7 +250,6 @@ class N_Data(object):
 						self.points[:,2], c=c, marker=m)
 			fig.suptitle('%s Point Locations' % title, 
 							fontsize=14, fontweight='bold')
-			ax.set_xlabel('X Value')
 			ax.set_ylabel('Y Value')
 			ax.set_zlabel('Z Value')
 		elif (self.dims == 2):
@@ -317,7 +316,7 @@ class N_Data(object):
 				g[:,D] = zs.imag/ step
 				points[:,D] = points[:,D].real
 
-			gerror = abs((g-self.gradient)/(g+0.000000000001)) * 100
+			gerror = abs((g-self.gradient)/(g+0.00000000000000001)) * 100.
 			gerror = np.sum(gerror, axis=1)/2
 			gavg = np.average(gerror)
 
@@ -385,8 +384,8 @@ class N_Data(object):
 		gradi = np.empty((len(self.values),self.dims-1), dtype='float')
 		vals = self.values.reshape((len(self.values)))
 		for D in range(self.dims-1):
-			PrdiPts[:,:].imag = 0
-			PrdiPts[:,D] = self.points[:,D] + (step*1j)
+			PrdiPts[:,:].imag = 0.
+			PrdiPts[:,D] = self.points[:,D] + (step*1.0j)
 			with suppress_stdout():
 				if (itype == 'LN'):
 					zi, junk = Interp(PrdiPts)
@@ -398,8 +397,7 @@ class N_Data(object):
 					zi, junk = Interp(PrdiPts, N, tension, bias, tight)
 
 			gradi[:,D] = zi.imag/ step
-
-		gerror = abs((gradi-self.gradient)/(gradi+0.0000000000001)) * 100
+		gerror = abs((gradi-self.gradient)/(gradi+0.000000000000000001)) * 100.
 		gerror = np.sum(gerror, axis=1)/(self.dims-1)
 		gavg = np.average(gerror)
 
@@ -593,17 +591,17 @@ class WNInterp(InterpBase):
 		print
 
 		## Setup problem
-		vals = 0
+		vals = 0.0
 		pdims = self.dims - 1
 		dimdiff = np.subtract(PrdPts.reshape(nppts,1,pdims), self.tp[nloc,:])
 		for D in range(pdims):
 			if (PrdPts[0,D].imag > 0):
 				## KD Tree ignores imaginary part, muse redo ndist if complex 
 				ndist = np.sqrt(np.sum((dimdiff**2), axis=2))
-				vals += 0j
+				vals += 0.0j
 		## Find the weighted neighbors per defined formula for distance effect
 		part = ndist**DistEff
-		sd = np.sum(1/part, axis=1)
+		sd = np.sum(1.0/part, axis=1)
 		vals += self.tv[nloc] 
 		wt = np.sum(vals[:,:,0]/part, axis=1)  
 		prdz = wt/sd
@@ -650,11 +648,11 @@ class CNInterp(InterpBase):
 				orgneighs[t,:,:] = neighvals[t,neighvals[t,:,D].argsort(),:]
 			## Make some temporary variables
 			tprd = PrdPts.reshape(nppts,1,(self.dims-1))
-			podiff = np.subtract(orgneighs[:,:,D], tprd[:,:,D])
+			podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])
 			## Gives the indices of the closest neighbors to each prdpt per dim.
 			cnd = np.argmin((np.abs(podiff)), axis=1)
 			## If the closest neighbor per dim is a smaller value, add 1.
-			cnd += np.ceil((-podiff[anppts,cnd].real+0.00000000000001) / \
+			cnd += np.ceil((podiff[anppts,cnd].real+0.00000000000001) / \
 					(np.abs(podiff[anppts,cnd].real*2)+0.00000000000001))
 			## Stay in the range!
 			cnd[cnd == 0] = 1
@@ -663,7 +661,7 @@ class CNInterp(InterpBase):
 			zl = orgneighs[anppts,(cnd-1),-1]
 			
 			ddiff = 1/(orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])
-			diff = -podiff[anppts,(cnd-1)] * ddiff
+			diff = podiff[anppts,(cnd-1)] * ddiff
 			
 			mu2 = (1-np.cos(np.pi*diff))/2
 			tprdz += zu * mu2 + zl * (1-mu2)
@@ -743,11 +741,11 @@ class HNInterp(InterpBase):
 				orgneighs[t,:,:] = neighvals[t,neighvals[t,:,D].argsort(),:]
 			## Make some temporary variables
 			tprd = PrdPts.reshape(nppts,1,(self.dims-1))
-			podiff = np.subtract(orgneighs[:,:,D], tprd[:,:,D])
+			podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])
 			## Gives the indices of the closest neighbors to each prdpt per dim.
 			cnd = np.argmin((np.abs(podiff)), axis=1)
 			## If the closest neighbor per dim is a smaller value, add 1.
-			cnd += np.ceil(-podiff[anppts,cnd].real / \
+			cnd += np.ceil(podiff[anppts,cnd].real / \
 					np.abs(podiff[anppts,cnd].real*2))
 			## Stay in the range!
 			cnd[cnd <= 1] = 2
@@ -755,7 +753,7 @@ class HNInterp(InterpBase):
 		
 			## Find location of value in min and max of neighvals to be used
 			ddiff = 1/(orgneighs[anppts,(cnd+u),D]-orgneighs[anppts,(cnd-l),D])
-			diff = -podiff[anppts,(cnd-l)] * ddiff 
+			diff = podiff[anppts,(cnd-l)] * ddiff 
 
 			for n in range(4):
 				## Only need 4 inputs.  Would like to remove this sometime
@@ -771,9 +769,6 @@ class HNInterp(InterpBase):
 
 ## More Information (As Promised) ==============================================
 
-print 
-print '^---- N Dimensional Interpolation ----^'
-print 
 
 
 '''
@@ -787,6 +782,11 @@ trn - Training Points:  Points with known values
 Ind - Independent: Dimensions which should be known
 Dep - Dependent:   Dimensions which are a function of Ind
 
+	    \/\/ Method Breakdown \/\/
+
+df suppress_stdout():
+df Solve(points, funct):		
+	rtrn z
 
 		\/\/ Class Breakdown \/\/
 
@@ -796,13 +796,17 @@ clss N_Data(object):
 	df CreateDep(self):
 	df PlotResults(self, title, pltfile='None'):
 	df PlotPoints(self, title, pltfile='None'):
-	df FindError(self, title, pltfile='None', plot=True,
-				 check=False, step=0.00000001):
-	df PlotAll(self, title, pltfile='None', erplot=True, 
-			   check=False,step=0.00000001):
+	df FindError(self, title, pltfile='None', plot=True, 
+				  check=False, step=0.00000001):
+	df CheckGrad(self, title, Interp, itype, pltfile='None', plot=True,
+				 check=False, step=0.00000001, N=5, DistEff=3, 
+				 tension=0, bias=0, tight=False):
+	df PlotAll(self, title, Interp, itype, pltfile='None', erplot=True, 
+			   check=False, step=0.00000001, neighs=5, 
+			   DistEff=3, tension=0, bias=0, tight=False):
 
 clss InterpBase(object):
-	df __init__(self, TrnPts, TrnVals, NumLeaves=8):
+	df __init__(self, TrnPts, TrnVals, NumLeaves=8):#, 
 	df FindNeighs(self, PrdPts, N=5): 
 		rtrn prdz, gradient, nppts, ndist, nloc
 
@@ -810,7 +814,7 @@ clss LNInterp(InterpBase):
 	df __call__(self, PrdPts):
 		rtrn prdz, gradient
 	
-clss WNInterp(InterpBase):
+clas WNInterp(InterpBase):
 	df __call__(self, PrdPts, N=5, DistEff=3):
 		rtrn prdz, gradient
 
@@ -821,8 +825,8 @@ clss CNInterp(InterpBase):
 clss HNInterp(InterpBase):
 	df HermFunctArr(self, y, mu, dmu, tension, bias):
 		rtrn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2]), \
-				(dmu*(b0*y[:,1] + b1*m0 + b2*m1 + b3*y[:,2]))
-	df __call__(self, PrdPts, N=8, tension=0, bias=0):
+				((dmu*(b0*y[:,1]+b1*m0+b2*m1+b3*y[:,2]))/(self.dims-1)).real
+	df __call__(self, PrdPts, N=5, tension=0, bias=0, tight=False):
 		rtrn prdz, gradient
 
 Note - some vowels removed to ensure vim friendliness.
@@ -830,24 +834,31 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Running Code ================================================================
 
-#pp = PdfPages('ND_Interpolation_Plots.pdf')
-step = 0.00000001
+
+'''
+
+print 
+print '^---- N Dimensional Interpolation ----^'
+print 
+
+#pp = PdfPages('ND_Interpolation_Plots.pdf') # Variable for saved file
+step = 0.00000001 # Complex step step size
 
 ## Problem Inputs and put into simpler variables
-minimum = -500
-maximum = 500
-trnpoints = 50000  # Minimum of 5 because of Hermite limitations
-prdpoints = 1000
-trndist = 'rand' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
-prddist = 'LH' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
-problem = '2D3O'
-neighbors = 20 # Default of about 1/1000 trnpoints, min 2
-DistanceEffect = 2
-tension = 0
-bias = 0
-NumLeaves = 100
-tight = True # Default algorithm had only true, change if neighs << trnpoints
-# or it is a high dimension (>3)
+minimum = -500 # Minimum value for independent range
+maximum = 500 # Maximum value for independent range
+trnpoints = 50000  # Number of training pts, min of 5 because of Hermite lims
+prdpoints = 2000  # Number of prediction points
+trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
+prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
+problem = '2D5O' # Problem type, options seen in organize inputs loop below
+neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
+tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
+bias = 0 # Attention to each closest neighbor in hermite, default 0
+NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
+tight = True # Default algorithm had only true, change if bad results with
+# neighs << trnpoints or a high dimension (>3)
 
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
@@ -859,6 +870,8 @@ elif ((problem == '5D2O') or (problem == '5D4O')):
 else:
 	print 'Problem type %s does not exist.' % problem
 	raise SystemExit
+
+## Shorten inputs for ease of typing
 pr = problem
 dim = dimensions
 N = neighbors
@@ -866,8 +879,10 @@ DE = DistanceEffect
 t = tension
 b = bias
 tt = tight
-erplot = False
-AbyT = 1
+
+## Extra Inputs
+erplot = False #Choose to plot error
+AbyT = 1 # Multilpier for actual to training data points
 
 ## Create the Independent Data
 train = N_Data(minimum, maximum, trnpoints, pr, trndist, dim)
@@ -1071,19 +1086,19 @@ print '-WN Interpolator:', (t2-t1)
 print '-CN Interpolator:', (t3-t2)
 print '-HN Interpolator:', (t4-t3)
 print
-'''
-with open("V4_Times.txt", "a") as efile:
-	efile.write("\nRun Times\n")
-	efile.write("\n-LN Interpolator:")
-	efile.write(str(t1-t0))
-	efile.write("\n-WN Interpolator:")
-	efile.write(str(t3-t2))
-	efile.write("\n-CN Interpolator:")
-	efile.write(str(t5-t4))
-	efile.write("\n-HN Interpolator:")
-	efile.write(str(t7-t6))
-'''
 
+#with open("V4_Times.txt", "a") as efile:
+#	efile.write("\nRun Times\n")
+#	efile.write("\n-LN Interpolator:")
+#	efile.write(str(t1-t0))
+#	efile.write("\n-WN Interpolator:")
+#	efile.write(str(t3-t2))
+#	efile.write("\n-CN Interpolator:")
+#	efile.write(str(t5-t4))
+#	efile.write("\n-HN Interpolator:")
+#	efile.write(str(t7-t6))
+
+'''
 #pp.close()
 #plt.show()
 
