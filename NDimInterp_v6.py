@@ -840,13 +840,14 @@ trnpoints = 50000  # Minimum of 5 because of Hermite limitations
 prdpoints = 1000
 trndist = 'rand' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH(3+D only), or cart (only for 2D and 3D)
-problem = 'Crate'
+problem = '2D3O'
 neighbors = 20 # Default of about 1/1000 trnpoints, min 2
 DistanceEffect = 2
 tension = 0
 bias = 0
 NumLeaves = 100
 tight = True # Default algorithm had only true, change if neighs << trnpoints
+# or it is a high dimension (>3)
 
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
