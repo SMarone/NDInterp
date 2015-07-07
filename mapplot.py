@@ -380,7 +380,115 @@ def plot_turbine():
 # =============================================================================
 execfile("../MapData/mapCompList.pyth.txt")
 execfile("../MapData/mapOpPoints.pyth.txt")
+execfile("NDimInterp.py")
 pylab.spectral()
+
+
+# =============================================================================
+#  STORE TRAINING DATA IN INTERPOLATION METHOD AND CREATE PREDICTED DATA 
+# =============================================================================
+
+
+
+# {}{}{}{}{}{}{}[ OLD CODE FOR RUNNING THE INTERPOLATION ]{}{}{}{}{}{}{}
+## START
+'''
+print 
+print '^---- N Dimensional Interpolation ----^'
+print 
+
+#pp = PdfPages('ND_Interpolation_Plots.pdf') # Variable for saved file
+step = 0.00000001 # Complex step step size
+
+## Problem Inputs and put into simpler variables
+minimum = -500 # Minimum value for independent range
+maximum = 500 # Maximum value for independent range
+trnpoints = 50000  # Number of training pts, min of 5 because of Hermite lims
+prdpoints = 2000  # Number of prediction points
+trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
+prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
+problem = '2D5O' # Problem type, options seen in organize inputs loop below
+neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
+tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
+bias = 0 # Attention to each closest neighbor in hermite, default 0
+NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
+tight = True # Default algorithm had only true, change if bad results with
+# neighs << trnpoints or a high dimension (>3)
+
+## Organize inputs
+if ((problem == '2D3O') or (problem == '2D5O')):
+    dimensions = 2
+elif ((problem == 'Plane') or (problem == 'PW') or (problem == 'Crate')):
+    dimensions = 3
+elif ((problem == '5D2O') or (problem == '5D4O')):
+    dimensions = 5
+else:
+    print 'Problem type %s does not exist.' % problem
+    raise SystemExit
+
+## Shorten inputs for ease of typing
+pr = problem
+dim = dimensions
+N = neighbors
+DE = DistanceEffect
+t = tension
+b = bias
+tt = tight
+
+## Extra Inputs
+erplot = False #Choose to plot error
+AbyT = 1 # Multilpier for actual to training data points
+
+## Create the Independent Data
+train = N_Data(minimum, maximum, trnpoints, pr, trndist, dim)
+actul = N_Data(minimum, maximum, (trnpoints*AbyT), pr, trndist, dim)
+predL = N_Data(minimum, maximum, prdpoints, pr, prddist, dim)
+
+predW = cp.deepcopy(predL)
+predC = cp.deepcopy(predL)
+predH = cp.deepcopy(predL)
+
+## Set Dependents for Training Data and Plot
+train.CreateDep()
+actul.CreateDep()
+
+## Setup Interpolation Methods around Training Points
+trainLNInt = LNInterp(train.points, train.values, NumLeaves)
+trainWNInt = WNInterp(train.points, train.values, NumLeaves)
+trainCNInt = CNInterp(train.points, train.values, NumLeaves)
+trainHNInt = HNInterp(train.points, train.values, NumLeaves)
+
+print
+print '^---- Running Interpolation Code ----^'
+print
+
+## Perform Interpolation on Predicted Points
+
+prdzL, prdgL = trainLNInt(predL.points)
+predL.AssignDep(prdzL, prdgL)
+
+prdzW, prdgW = trainWNInt(predW.points, N, DE)
+predW.AssignDep(prdzW, prdgW)
+
+prdzC, prdgC = trainCNInt(predC.points, N)
+predC.AssignDep(prdzC, prdgC)
+
+
+prdzH, prdgH = trainHNInt(predH.points, N, t, b, tt)
+predH.AssignDep(prdzH, prdgH)
+
+
+
+'''
+## END
+# {}{}{}{}{}{}{}[ OLD CODE FOR RUNNING THE INTERPOLATION ]{}{}{}{}{}{}{}
+
+# =============================================================================
+#  DETERMINE RESULTS FOR PREDICTED DATA
+# =============================================================================
+
+
 
 # =============================================================================
 #  CREATE THE PLOTS FOR EACH COMPONENT MAP IN TURN
@@ -447,6 +555,10 @@ for component in range(0,len(component_list)-1):
             for alpha in range( 0,len( mapdata ) ):
                pylab.figure()
                plot_turbine()
+
+# =============================================================================
+#  CREATE MAPS FROM THE INTERPOLATED DATA
+# =============================================================================
 
 # =============================================================================
 #  DISPLAY ALL OF THE CREATED PLOTS
