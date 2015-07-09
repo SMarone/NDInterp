@@ -60,7 +60,7 @@ def Solve(points, funct):
 		## Simple Plane Function, made up
 		x = points[:,0]
 		y = points[:,1]
-		z = -5*x + 24*y
+		z = 3*x+24*y
 	elif (funct == '5D2O'):
 		## Completely made up
 		v = points[:,0]
@@ -107,13 +107,14 @@ class N_Data(object):
 		print "-Data Distribution Type:", dtype
 		print "-Quantity of Points:", numpts
 		print "-Dimensions:", dims
-		print "-Range of each dimension: [%s,%s]" % (mini, maxi)
+		for d in range(dims-1):
+			print "-Range of dimension %s: [%s,%s]" % ((d+1), mini[d], maxi[d])
 		print
 		## Setup independent data for each function via distribution
 		if (dtype == 'rand'):
 			self.points = np.random.rand(numpts,dims-1) * \
 										(maxi-mini) + mini
-			
+		
 			if (dims == 2):
 				self.points = np.sort(self.points, axis=0)
 			'''
@@ -135,20 +136,20 @@ class N_Data(object):
 			points = np.zeros((numpts,dims-1), dtype="float")
 			for d in range(dims-1):
 				## Latin Hypercube it up
-				points[:,d] = np.linspace(mini,maxi,numpts)
+				points[:,d] = np.linspace(mini[d],maxi[d],numpts)
 				np.random.shuffle(points[:,d])
 			self.points = points
 			
 		elif (dtype == 'cart'):
 			if (dims == 3):
 				stp = (maxi-mini)/(np.sqrt(numpts)-1)
-				x = np.arange(mini,maxi,stp)
-				y = np.arange(mini,maxi,stp)
+				x = np.arange(mini[0],maxi[0],stp[0])
+				y = np.arange(mini[1],maxi[1],stp[1])
 				x, y = np.meshgrid(x, y)
 				self.points = np.transpose(np.array([x.flatten(), y.flatten()]))
 			elif (dims == 2):
-				stp = float(maxi-mini)/float(numpts+1)
-				x = np.arange((mini+stp),maxi,stp)
+				stp = float(maxi[0]-mini[0])/float(numpts+1)
+				x = np.arange((mini[0]+stp),maxi[0],stp)
 				self.points = np.transpose(np.array([x.flatten()]))
 			else:
 				print 'Can not currently do cartesian in any dimension \
@@ -344,9 +345,9 @@ class N_Data(object):
 							  fontsize=14, fontweight='bold')
 				gbax = np.reshape(gbax,((self.dims-1)))
 				for D in range(self.dims-1):
-					ming = min(g[:,D])
+					ming = min(self.gradient[:,D])
 					ming -= 0.05*abs(ming)
-					maxg = max(g[:,D])
+					maxg = max(self.gradient[:,D])
 					maxg += 0.05*abs(ming)
 					gbax[D].plot(points[:,D].real,g[:,D],'bo',
 								 points[:,D].real,self.gradient[:,D],'rx')
@@ -427,9 +428,9 @@ class N_Data(object):
 						  fontsize=14, fontweight='bold')
 			gbax = np.reshape(gbax,((self.dims-1)))
 			for D in range(self.dims-1):
-				ming = min(gradi[:,D])
+				ming = min(self.gradient[:,D])
 				ming -= 0.05*abs(ming)
-				maxg = max(gradi[:,D])
+				maxg = max(self.gradient[:,D])
 				maxg += 0.05*abs(ming)
 				gbax[D].plot(PrdiPts[:,D].real,gradi[:,D],'bo',
 							 PrdiPts[:,D].real,self.gradient[:,D],'rx')
@@ -528,7 +529,7 @@ class LNInterp(InterpBase):
 		print '-Nearest Neighbor Distance:', np.min(ndist)
 		print '-Farthest Neighbor Distance:', np.max(ndist)
 		print
-		
+	
 		## Need to ensure there are enough dimensions to find the normal with
 		if (dims > 2):
 			## Extra Inputs for Finding the normal are found below
@@ -562,10 +563,11 @@ class LNInterp(InterpBase):
 			## The pc is the constant of the n dimensional plane.
 			## It uses the point which is from the closest neighbor
 			pc = np.einsum('ij, ij->i',trnd[:,0,:],normal)
-			
-			if (np.any(normal[-1]) == 0):
-			    print 'Error, dependent variable has infinite answers.'
-			    return prdz, gradient
+		
+			if (np.any(normal[:,-1]) == 0):
+				print 'ERROR: Dependent variable has infinite answers.'
+				print
+				return prdz, gradient
 			
 			gradient = -normal[:,:-1]/normal[:,-1:]
 			
@@ -835,27 +837,27 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Running Code ================================================================
 
-
+'''
 print 
 print '^---- N Dimensional Interpolation ----^'
 print 
 
-#pp = PdfPages('ND_Interpolation_Plots.pdf') # Variable for saved file
+pp = PdfPages('ND_Interpolation_Plots.pdf') # Variable for saved file
 step = 0.00000001 # Complex step step size
 
 ## Problem Inputs and put into simpler variables
-minimum = -500 # Minimum value for independent range
-maximum = 500 # Maximum value for independent range
-trnpoints = 50000  # Number of training pts, min of 5 because of Hermite lims
-prdpoints = 2000  # Number of prediction points
+minimum = np.array([-5, -1]) # Minimum value for independent range
+maximum = np.array([5, 2]) # Maximum value for independent range
+trnpoints = 5000  # Number of training pts, min of 5 because of Hermite lims
+prdpoints = 500  # Number of prediction points
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = '2D5O' # Problem type, options seen in organize inputs loop below
-neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+problem = 'Plane' # Problem type, options seen in organize inputs loop below
+neighbors = 10 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
-NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
+NumLeaves = 10 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = True # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
 
@@ -880,7 +882,7 @@ b = bias
 tt = tight
 
 ## Extra Inputs
-erplot = False #Choose to plot error
+erplot = True #Choose to plot error
 AbyT = 1 # Multilpier for actual to training data points
 
 ## Create the Independent Data
@@ -940,7 +942,7 @@ print
 if (dimensions == 3):
 
 	#actul.PlotResults('Actual Data')
-	#train.PlotResults('Training Data', pp)
+	train.PlotResults('Training Data', pp)
 
 	predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
 			pltfile='None', erplot=erplot, check=False, 
@@ -1099,8 +1101,8 @@ print
 
 
 #pp.close()
-#plt.show()
-
+plt.show()
+'''
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
 # but their value is unknown usually and can only be determined when related to
