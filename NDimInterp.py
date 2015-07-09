@@ -853,6 +853,7 @@ prdpoints = 500  # Number of prediction points
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
 problem = 'Plane' # Problem type, options seen in organize inputs loop below
+'''
 neighbors = 10 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
@@ -860,7 +861,7 @@ bias = 0 # Attention to each closest neighbor in hermite, default 0
 NumLeaves = 10 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = True # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
-
+'''
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
 	dimensions = 2
