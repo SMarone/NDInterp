@@ -13,7 +13,7 @@ import sys, os
 ##   Written by Stephen Marone
 ##     Intern at the NASA GRC  
 ## Project Start - June 8th, 2015
-## Program Version 7
+## Program Version 8
 
 ## This is an n-dimensional interpolation code.  More information can be found
 # at the end of the code along with the lines which run it.
@@ -397,6 +397,8 @@ class N_Data(object):
 					zi, junk = Interp(PrdiPts, N)
 				elif (itype == 'HN'):
 					zi, junk = Interp(PrdiPts, N, tension, bias, tight)
+				elif (itype == 'CR'):
+					zi, junk = Interp(PrdiPts, N)
 
 			gradi[:,D] = zi.imag/ step
 		gerror = abs((gradi-self.gradient)/(gradi+0.000000000000000001)) * 100.
@@ -479,11 +481,10 @@ class InterpBase(object):
 		self.ntpts = len(TrnPts[:,0])
 		self.nl = NumLeaves
 
-	def FindNeighs(self, PrdPts, N=5): 
+	def FindNearNeighs(self, PrdPts, N=5): 
 		## Uses a KD Tree to set the distances, locations, and values 
 		# of the closest neighbors to each point in the 
 		nppts = len(PrdPts[:,0])
-		prdz = np.zeros(nppts, dtype="float")
 		numtrn = self.ntpts
 		numleaves = self.nl
 
@@ -516,6 +517,98 @@ class InterpBase(object):
 		ndcheck, nloccheck = KData.query(PrdPts.imag, N)
 		return prdz, gradient, nppts, ndist, nloc
 
+	def FindRadNeighs(self, PrdPts, N=5, rad=0.0): 
+		## Uses a KD Tree to set the distances, locations, and values 
+		# of the nieghbors within a radius to each point in the 
+
+		nppts = len(PrdPts[:,0])
+		numtrn = self.ntpts
+		numleaves = self.nl
+		#dc = np.zeros((nppts, numtrn), dtype="float")
+		
+		if (rad==0):
+			count = 0
+			## If compact domain radius is not set, use an average 
+			# distance but ignore any colinear points in it.
+
+			for d in xrange(self.dims-1):
+				rad += ((np.max(self.tp[:,d]) - np.min(self.tp[:,d]))*N)\
+						/numtrn
+			rad = rad/(self.dims-1)
+			''' Heavy rad determination
+			for i in xrange(nppts):
+				print 'At %s out of %s' % (i, nppts)
+				for j in xrange(numtrn):
+					dc[i,j] = spatial.distance.euclidean(self.tp[i,:], \
+													self.tp[j,:])
+					if (dc[i,j] > 0.000000000001):
+							## Want to ignore 0s - colinear points
+							rad += dc[i,j]
+							count +=1
+			rad = rad/count
+			'''
+
+		print 'Interpolation Input Values'
+		print '-Approximate Number of Neighbors:', N
+		print '-KDTree Leaves:', numleaves
+		print '-Number of Points Analyzed:', nppts
+		print
+		## Make into training data into a Tree
+		leavesz = math.ceil(numtrn/(numleaves+0.00000000000001))
+		KData = spatial.KDTree(self.tp,leafsize=leavesz)
+
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
+		nloc = KData.query_ball_point(PrdPts ,rad)
+		return rad, nppts, nloc
+	
+	def FindEllNeighs(self, PrdPts, rad=0): 
+		## Uses a KD Tree to set the distances, locations, and values 
+		# of the nieghbors within a radius to each point in the 
+
+		nppts = len(PrdPts[:,0])
+		numtrn = self.ntpts
+		numleaves = self.nl
+		
+		if (rad==0):
+			rad = np.zeros(self.dims, dtype="float")
+			count = np.zeros(self.dims, dtype="int")
+			## If compact domain radius is not set, use an average 
+			# distance but ignore any colinear points in it.
+			for i in xrange(numtrn):
+				for j in (xrange(i) + xrange((i+1),numtrn)):
+					dc = np.abs(self.tp[i,:] - self.tp[j,:])
+					for d in xrange(self.dims):
+						if (dc[d] > 0.000000000001):
+							## Want to ignore 0s - colinear points
+							rad[d] += dc[d]
+							count[d] +=1
+			rad = rad/count
+
+		prdz = np.zeros(nppts, dtype="float")
+		gradient = np.zeros((nppts, self.dims-1), dtype="float")
+
+		print 'Interpolation Input Values'
+		print '-KDTree Leaves:', numleaves
+		print '-Compact Support Domain Radii:', rad
+		print '-Number of Training Points:', numtrn
+		print '-Number of Predicted Points:', nppts
+		print
+		'''
+		NEED TO REWRITE THIS PART FOR THE ELLIPTICAL TO WORK
+		## Make into training data into a Tree
+		leavesz = math.ceil(numtrn/(numleaves+0.00000000000001))
+		KData = spatial.KDTree(self.tp,leafsize=leavesz)
+
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
+		ndist, nloc = KData.query(PrdPts ,rad)
+		ndcheck, nloccheck = KData.query(PrdPts.imag, N)
+		'''
+		return prdz, gradient, nppts, ndist, nloc
+
+
+
 class LNInterp(InterpBase):
 	def __call__(self, PrdPts):
 		## This method uses linear interpolation by defining a plane with
@@ -523,7 +616,7 @@ class LNInterp(InterpBase):
 		dims = self.dims
 
 		## Find them neigbors
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=dims)
+		prdz, gradient, nppts, ndist, nloc = self.FindNearNeighs(PrdPts, N=dims)
 
 		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -586,7 +679,7 @@ class WNInterp(InterpBase):
 	## Weighted Neighbor Interpolation
 	def __call__(self, PrdPts, N=5, DistEff=3):
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNearNeighs(PrdPts, N=N)
 
 		print 'Weighted Nearest Neighbors (WN) KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -627,7 +720,7 @@ class CNInterp(InterpBase):
 	## Cosine Neighbor Interpolation
 	def __call__(self, PrdPts, N=5):
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNearNeighs(PrdPts, N=N)
 		
 		print 'Cosine Nearest Neighbors (CN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -719,7 +812,7 @@ class HNInterp(InterpBase):
 		if (N < 5):
 			N = 5
 
-		prdz, gradient, nppts, ndist, nloc = self.FindNeighs(PrdPts, N=N)
+		prdz, gradient, nppts, ndist, nloc = self.FindNearNeighs(PrdPts, N=N)
 
 		print 'Hermite Nearest Neighbors (HN) Interpolation KDTree Results'
 		print '-Nearest Neighbor Distance:', np.min(ndist)
@@ -770,6 +863,59 @@ class HNInterp(InterpBase):
 		prdz = tprdz/(D+1)
 		return prdz, gradient
 
+class CRInterp(InterpBase):
+	## Compactly Supported Radial Basis Function
+	def __call__(self, PrdPts, N=5, rad=0.0):
+		## For weights, first find the training points radial neighbors
+		rad, ntpts, tloc = self.FindRadNeighs(self.tp, N, rad)
+		
+		print 'Compactly Supported Radial Basis Function (CR) KDTree Results'
+		print '-Compact Support Domain Radius:', rad
+		print
+
+		## Next determine weight matrix
+		Rt = np.zeros((ntpts, ntpts), dtype="float")
+		for i in xrange(ntpts):
+			for j in tloc[i]:
+				Tt = spatial.distance.euclidean(self.tp[j,:], \
+												self.tp[i,:])/rad
+				## Comp #1
+				#five = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
+				#Rt[i,j] = five * (8+(40*Tt)+(48*Tt*Tt)+ \
+				#		(72*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt))
+				## Comp #2
+				six = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
+				Rt[i,j] = six * (6+(36*Tt)+(82*Tt*Tt)+(72*Tt*Tt*Tt)+ \
+						(30*Tt*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt*Tt))
+		#weights = np.dot(np.linalg.inv(Rt), self.tv)
+		weights = np.dot(np.linalg.inv(Rt), self.tv)
+
+		## Setup prediction points and find their radial neighbors 
+		rad, nppts, ploc = self.FindRadNeighs(PrdPts, N, rad)
+		prdz = np.zeros(nppts, dtype="float")
+		gradient = np.zeros((nppts, self.dims-1), dtype="float")
+		Rp = np.zeros((nppts, ntpts), dtype="float")
+
+		for i in xrange(nppts):
+			for j in ploc[i]:
+				Tt = spatial.distance.euclidean(PrdPts[i,:], \
+												self.tp[j,:])/rad
+				## Comp #1
+				#five = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
+				#Rt[i,j] = five * (8+(40*Tt)+(48*Tt*Tt)+ \
+				#		(72*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt))
+				## Comp #2
+				six = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
+				Rp[i,j] = six * (6+(36*Tt)+(82*Tt*Tt)+(72*Tt*Tt*Tt)+ \
+						(30*Tt*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt*Tt))
+
+		prdz = np.dot(Rp, weights)
+		
+		## Solve for gradient
+		 
+		return prdz, gradient
+
+
 ## More Information (As Promised) ==============================================
 
 
@@ -810,7 +956,7 @@ clss N_Data(object):
 
 clss InterpBase(object):
 	df __init__(self, TrnPts, TrnVals, NumLeaves=8):#, 
-	df FindNeighs(self, PrdPts, N=5): 
+	df FindNearNeighs(self, PrdPts, N=5): 
 		rtrn prdz, gradient, nppts, ndist, nloc
 
 clss LNInterp(InterpBase):
@@ -837,7 +983,7 @@ Note - some vowels removed to ensure vim friendliness.
 
 ## Running Code ================================================================
 
-'''
+
 print 
 print '^---- N Dimensional Interpolation ----^'
 print 
@@ -853,15 +999,16 @@ prdpoints = 500  # Number of prediction points
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
 problem = 'Plane' # Problem type, options seen in organize inputs loop below
-'''
-neighbors = 10 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+
+neighbors = 30 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
+radius = 0.0 # Domain of compact support radius for CRBF, default 0
 NumLeaves = 10 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = True # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
-'''
+
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
 	dimensions = 2
@@ -893,6 +1040,7 @@ predL = N_Data(minimum, maximum, prdpoints, pr, prddist, dim)
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
+predR = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
@@ -903,6 +1051,7 @@ trainLNInt = LNInterp(train.points, train.values, NumLeaves)
 trainWNInt = WNInterp(train.points, train.values, NumLeaves)
 trainCNInt = CNInterp(train.points, train.values, NumLeaves)
 trainHNInt = HNInterp(train.points, train.values, NumLeaves)
+trainCRInt = CRInterp(train.points, train.values, NumLeaves)
 
 print
 print '^---- Running Interpolation Code ----^'
@@ -932,6 +1081,12 @@ predH.AssignDep(prdzH, prdgH)
 
 t4 = time.time()
 
+prdzR, prdgR = trainCRInt(predR.points, N, radius)
+
+predR.AssignDep(prdzR, prdgR)
+
+t5 = time.time()
+
 ## Plot All Results, Point Locations, and Error
 
 print
@@ -957,6 +1112,9 @@ if (dimensions == 3):
 	predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
 			pltfile='None', erplot=erplot, check=False,
 			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+	predR.PlotAll('CR Predicted Data', trainCRInt, 'CR',
+			pltfile='None', erplot=erplot, check=False,
+			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
 
 elif (dimensions == 2):
 	
@@ -974,18 +1132,20 @@ elif (dimensions == 2):
 	Cy = predC.values[:,0].flatten().real
 	Hx = predH.points[:,0].flatten().real
 	Hy = predH.values[:,0].flatten().real
+	Rx = predH.points[:,0].flatten().real
+	Ry = predH.values[:,0].flatten().real
 	xmi = np.min(Ax)
 	xma = np.max(Ax)
 	ymi = np.min(Ay)
 	yma = np.max(Ay)
-	plt.plot(Ax, Ay, 'k-', Tx, Ty, 'bo', Lx, Ly, 'y--',Wx, Wy, 'g--',Cx, Cy, 'c-.',Hx, Hy, 'r-.')
+	plt.plot(Ax, Ay, 'k-', Tx, Ty, 'bo', Lx, Ly, 'y--',Wx, Wy, 'g--',Cx, Cy, 'c-.',Hx, Hy, 'r-.',Rx, Ry, 'm-.')
 	fig.suptitle('Predicted Data Results', 
 					fontsize=14, fontweight='bold')
 	plt.xlabel('Independent Variable')
 	plt.ylabel('Dependent Variable')
 	plt.xlim(xmi, xma)
 	plt.ylim(ymi, yma)
-	plt.legend(['Actual', 'Training', 'Linear', 'Weighted', 'Cosine', 'Hermite'], loc=4, prop={'size':10})
+	plt.legend(['Actual', 'Training', 'Linear', 'Weighted', 'Cosine', 'Hermite', 'CRBF'], loc=4, prop={'size':10})
 
 	fig = plt.figure()
 	title = 'Linear'
@@ -1063,6 +1223,24 @@ elif (dimensions == 2):
 					pltfile='None',plot=erplot,check=False,
 					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 
+	fig = plt.figure()
+	title = 'CRBF'
+	
+	Px = predR.points[:,0].flatten().real
+	Py = predR.values[:,0].flatten().real
+	plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+	fig.suptitle('%s Data Results' % title, 
+					fontsize=14, fontweight='bold')
+	plt.xlabel('Independent Variable')
+	plt.ylabel('Dependent Variable')
+	plt.xlim(xmi, xma)
+	plt.ylim(ymi, yma)
+	plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+
+	predR.FindError('CR Predicted Data', 'None', erplot, False)
+	predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 else:
 	
 	predL.FindError('LN Predicted Data', 'None', erplot, False)
@@ -1081,12 +1259,17 @@ else:
 	predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
 					pltfile='None',plot=erplot,check=False,
 					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	predR.FindError('CR Predicted Data', 'None', erplot, False)
+	predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+					pltfile='None',plot=erplot,check=False,
+					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 
 print 'Run Times'
 print '-LN Interpolator:', (t1-t0)
 print '-WN Interpolator:', (t2-t1)
 print '-CN Interpolator:', (t3-t2)
 print '-HN Interpolator:', (t4-t3)
+print '-CR Interpolator:', (t5-t4)
 print
 
 #with open("V4_Times.txt", "a") as efile:
@@ -1103,7 +1286,7 @@ print
 
 #pp.close()
 plt.show()
-'''
+
 ## Side note: PrdPts are predicted points technically although it's not really 
 # that simple. They are better named pride points.  Everyone needs pride points,
 # but their value is unknown usually and can only be determined when related to

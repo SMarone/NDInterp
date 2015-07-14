@@ -1,6 +1,8 @@
 from matplotlib import pylab 
 import numpy as np
 
+problemtype = 'WN'
+
 linecolors = [ 'red', 'green', 'blue', 'orange', 'magenta', 'cyan',
 	'saddlebrown', 'skyblue', 'olivedrab', 'yellowgreen', 'black' ]
 
@@ -273,7 +275,6 @@ for component in range(len(component_list)-1):
 	Veff = []
 	Vspd = []
 	prddata = []
-	problemtype = 'HN'
 
 	## Read this component data
 	execfile(component_list[component])
@@ -288,10 +289,12 @@ for component in range(len(component_list)-1):
 	## Start setting up plotting
 	if (maptype == 'RLINE') or (maptype == 'BETA'):
 		for alpha in range(len(mapdata)):
-			pylab.figure()
+			if (alpha!= 0):
+				pylab.figure()
 			plot_compressor(maptype, mapdata, scaled_map, scalars, overlay, 
 				axes, filled, show_lines, Vspd, Veff)
 			pylab.figure()
 			interpcheck()
+
 
 pylab.show()
