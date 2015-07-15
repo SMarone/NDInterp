@@ -802,73 +802,78 @@ class HNInterp(InterpBase):
 
 class CRInterp(InterpBase):
 	## Compactly Supported Radial Basis Function
-	def __call__(self, PrdPts, N=5):
+	def FindR(self, Comp, npp, ntp, dist, loc): 
+		R = np.zeros((npp, ntp), dtype="float")
+		Tn  = dist[:,:-1]/dist[:,-1:]
+
+		## Choose type of CRBF R matrix
+		if (Comp == 1):
+			## Comp #1
+			Cf = (1-Tn)*(1-Tn)*(1-Tn)*(1-Tn)*(1-Tn)
+			Cb  = (8+(40*Tn)+(48*Tn*Tn)+ \
+					  (72*Tn*Tn*Tn)+(5*Tn*Tn*Tn*Tn))
+		else:
+			## Comp #2
+			Cf = (1-Tn)*(1-Tn)*(1-Tn)*(1-Tn)*(1-Tn)*(1-Tn)
+			Cb = (6+(36*Tn)+(82*Tn*Tn)+(72*Tn*Tn*Tn)+ \
+						(30*Tn*Tn*Tn*Tn)+(5*Tn*Tn*Tn*Tn*Tn))
+
+		for i in xrange(npp):
+			c = 0
+			for j in loc[i,:-1]:	
+				R[i,j] = Cf[i,c] * Cb[i,c]
+				c += 1
+		return R
+
+	def __call__(self, PrdPts, N=5, comp=2):
 		ntpts = self.ntpts
 		nppts = len(PrdPts[:,0])
+		t0 = time.time()
 		## Start by creating a KDTree around the training points
 		KData = self.SetRadNeighs(self.tp, N)
 		## For weights, first find the training points radial neighbors
-		tdist, tloc = KData.query(self.tp, N)
+		t1 = time.time()
+		## Adjust neighbors with respect to the number of pred vs train
+		tN = N#math.ceil(N*nppts/ntpts) + 2
+		tdist, tloc = KData.query(self.tp, tN)
 		# Take farthest distance of each point
-		trad = tdist[:,-1]
 		print 'Compactly Supported Radial Basis Function (CR) KDTree Results'
 		print '-Compact Support Domain Radius varies.'
 		print
-
+		t2 = time.time()
 		## Next determine weight matrix
-		Rt = np.zeros((ntpts, ntpts), dtype="float")
-		for i in xrange(ntpts):
-			for j in tloc[i]:
-				Tt = spatial.distance.euclidean(self.tp[i,:], \
-												self.tp[j,:])/trad[i]
-				if (Tt > 1):
-					print Tt, 'at 1'
-					continue
-				elif (Tt < 0):
-					print Tt, 'at 2'
-					continue
+		t3 = time.time()
+		Rt = self.FindR(comp, ntpts, ntpts, tdist, tloc) 
 
-				## Comp #1
-				#five = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
-				#Rt[i,j] = five * (8+(40*Tt)+(48*Tt*Tt)+ \
-				#		(72*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt))
-				## Comp #2
-				six = (1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)*(1-Tt)
-				Rt[i,j] = six * (6+(36*Tt)+(82*Tt*Tt)+(72*Tt*Tt*Tt)+ \
-						(30*Tt*Tt*Tt*Tt)+(5*Tt*Tt*Tt*Tt*Tt))
-		weights = np.dot(np.linalg.inv(Rt), self.tv)
+		t4 = time.time()
+		weights = np.linalg.solve(Rt, self.tv)
 
+		t5 = time.time()
 		## Setup prediction points and find their radial neighbors 
 		pdist, ploc = KData.query(PrdPts, N)
 		## Take farthest distance of each point
+		t6 = time.time()
 		prad = pdist[:,-1]
 
 		## Setup variables
 		gradient = np.zeros((nppts, self.dims-1), dtype="float")
-		Rp = np.zeros((nppts, ntpts), dtype="float")
-
-		for i in xrange(nppts):
-			for j in ploc[i]:
-				Tp = spatial.distance.euclidean(PrdPts[i,:], \
-												self.tp[j,:])/prad[i]
-				if (Tt > 1):
-					print Tt, 'at 3'
-					Tt = 1
-				elif (Tt < 0):
-					print Tt, 'at 4'
-					Tt = 0
-				## Comp #1
-				#five = (1-Tp)*(1-Tp)*(1-Tp)*(1-Tp)*(1-Tp)
-				#Rp[i,j] = five * (8+(40*Tp)+(48*Tp*Tp)+ \
-				#		(72*Tp*Tp*Tp)+(5*Tp*Tp*Tp*Tp))
-				## Comp #2
-				six = (1-Tp)*(1-Tp)*(1-Tp)*(1-Tp)*(1-Tp)*(1-Tp)
-				Rp[i,j] = six * (6+(36*Tp)+(82*Tp*Tp)+(72*Tp*Tp*Tp)+ \
-						(30*Tp*Tp*Tp*Tp)+(5*Tp*Tp*Tp*Tp*Tp))
+		t7 = time.time()
+		Rp = self.FindR(comp, nppts, ntpts, pdist, ploc) 
+		
+		t8 = time.time()
 		prdz = np.dot(Rp, weights)
 		
+		t9 = time.time()
 		## Solve for gradient
-		 
+		print 'Time 0:', (t1-t0) 
+		print 'Time 1:', (t2-t1) 
+		print 'Time 2:', (t3-t2) 
+		print 'Time 3:', (t4-t3) 
+		print 'Time 4:', (t5-t4) 
+		print 'Time 5:', (t6-t5) 
+		print 'Time 6:', (t7-t6) 
+		print 'Time 7:', (t8-t7) 
+		print 'Time 8:', (t9-t8) 
 		return prdz, gradient
 
 
@@ -967,6 +972,9 @@ tight = True # Default algorithm had only true, change if bad results with
 
 if (neighbors == 0):
 	neighbors = int(trnpoints/200)
+
+if (NumLeaves == 0):
+	NumLeaves = int(trnpoints/500)
 
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
