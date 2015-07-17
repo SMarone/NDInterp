@@ -1,7 +1,7 @@
 from matplotlib import pylab 
 import numpy as np
 
-problemtype = 'WN'
+problemtype = 'CR'
 
 linecolors = [ 'red', 'green', 'blue', 'orange', 'magenta', 'cyan',
 	'saddlebrown', 'skyblue', 'olivedrab', 'yellowgreen', 'black' ]
@@ -255,6 +255,10 @@ def interpcheck():
 			trainInt = HNInterp(trnpts, trnvls[:,dep,:], NumLeaves)
 			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
 					trainInt(prdpts, neighbors, tension, bias, tight)
+		elif (problemtype == 'CR'):
+			trainInt = CRInterp(trnpts, trnvls[:,dep,:], neighbors, NumLeaves, comp)
+			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+					trainInt(prdpts)
 	prddata.append( \
 			unstructtolist( prdpts, prdvls, numpts, ilength, jlengths))
 	plot_compressor(maptype, prddata, scaled_map, scalars, overlay, 
