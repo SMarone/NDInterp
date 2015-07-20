@@ -15,7 +15,7 @@ import sys, os
 ##   Written by Stephen Marone
 ##     Intern at the NASA GRC  
 ## Project Start - June 8th, 2015
-## Program Version 9
+## Program Version 11
 
 ## This is an n-dimensional interpolation code.  More information can be found
 # at the end of the code along with the lines which run it.
@@ -709,7 +709,6 @@ class HNInterp(NNInterpBase):
 			# but very badly with larger problems
 			u -= 1
 			l -= 1
-		if (N < 5):
 			## Hermite requires at least 5 neighbors
 			N = 5
 
@@ -948,7 +947,7 @@ clss HNInterp(InterpBase):
 Note - some vowels removed to ensure vim friendliness.
 '''
 ## Running Code ================================================================
-
+'''
 
 print 
 print '^---- N Dimensional Interpolation ----^'
@@ -964,10 +963,10 @@ maximum = np.array([500, 500]) # Maximum value for independent range
 trndist = 'cart' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 problem = '2D3O' # Problem type, options seen in organize inputs loop below
-
+'''
 trnpoints = 10  # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 1000  # Number of prediction points
-neighbors = 5 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+neighbors = 10 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
@@ -991,7 +990,7 @@ if (NumLeaves > (trnpoints/neighbors)):
 				print 'The problem has too few training points for'
 				print 'its number of dimensions.'
 				raise SystemExit
-
+'''
 ## Organize inputs
 if ((problem == '2D3O') or (problem == '2D5O')):
 	dimensions = 2
@@ -1270,7 +1269,6 @@ print '-CR Interpolator Setup:', (p5-p4)
 print '-CR Interpolator Query:', (t5-t4)
 print
 
-'''
 with open("RunError.txt", "a") as efile:
 	efile.write(predL.funct+ "\n")       
 	efile.write("Run"+ "\n")
@@ -1310,11 +1308,10 @@ with open("RunError.txt", "a") as efile:
 	efile.write(str(np.average(predR.gcerror))+ "\n")
 	efile.write(str(    np.max(predR.gcerror))+ "\n")
 	efile.write("\n")
-'''
 
 #pp.close()                             
 plt.show()                              
-                                        
+'''                                    
 ## Written Out =================================================================
                                         
 '''                                     

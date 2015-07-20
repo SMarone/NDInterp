@@ -1,7 +1,7 @@
 from matplotlib import pylab 
 import numpy as np
 
-problemtype = 'CR'
+problemtype = 'WN'
 
 linecolors = [ 'red', 'green', 'blue', 'orange', 'magenta', 'cyan',
 	'saddlebrown', 'skyblue', 'olivedrab', 'yellowgreen', 'black' ]
@@ -35,7 +35,7 @@ def unstructtolist(uspts, usvls, numpts, ilength, jlengths):
 
 	return ldata
 
-def plot_compressor(maptype, mapdata, scaled_map, scalars, overlay, 
+def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay, 
 					axes, filled, show_lines, Vspd, Veff): 
 	# ==========================================================================
 	# each compressor plot consists of the following elements based on map type:
@@ -261,7 +261,7 @@ def interpcheck():
 					trainInt(prdpts)
 	prddata.append( \
 			unstructtolist( prdpts, prdvls, numpts, ilength, jlengths))
-	plot_compressor(maptype, prddata, scaled_map, scalars, overlay, 
+	plot_compressor(mapname, maptype, prddata, scaled_map, scalars, overlay, 
 		axes, filled, show_lines, Vspd, Veff)
 	## END interpcheck DEFINITION
 
@@ -295,9 +295,11 @@ for component in range(len(component_list)-1):
 		for alpha in range(len(mapdata)):
 			if (alpha!= 0):
 				pylab.figure()
-			plot_compressor(maptype, mapdata, scaled_map, scalars, overlay, 
+			mapname = 'Training Data'
+			plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay, 
 				axes, filled, show_lines, Vspd, Veff)
 			pylab.figure()
+			mapname = 'Predicted Data'
 			interpcheck()
 
 
