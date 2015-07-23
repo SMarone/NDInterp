@@ -548,8 +548,9 @@ class LNInterp(NNInterpBase):
 
 	def main2D(self, PrdPts, nppts, nloc):
 				## Need to find a tangent instead of a normal, y=mx+b
-			m = (self.tv[nloc[:,1],0] - self.tv[nloc[:,0],0])/ \
-				(self.tp[nloc[:,1],0] - self.tp[nloc[:,0],0])
+			d = self.tp[nloc[:,1],0] - self.tp[nloc[:,0],0]
+			d[d < 0.000000000001] = 100000000000000000000
+			m = (self.tv[nloc[:,1],0] - self.tv[nloc[:,0],0]) / d
 			b = self.tv[nloc[:,0],0] - (m * self.tp[nloc[:,0],0])	
 			return m, b
 
@@ -572,12 +573,14 @@ class LNInterp(NNInterpBase):
 		## Need to ensure there are enough dimensions to find the normal with
 		if (self.dims > 2):
 			normal, prdtemp, pc = self.main(PrdPts, nppts, self.dims, nloc)
-			if (np.any(normal[:,-1]) == 0):
-				print 'ERROR: Dependent variable has infinite answers.'
-				print
-				prdz = 0
-				return prdz
-			prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)/-normal[:,-1]
+			## Set all prdz from values on plane
+			prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)
+			## Check to see if there are any colinear points amd replace them
+			n0 = np.where(normal[:,-1] == 0)
+			prdz[n0] = (self.tv[nloc[n0,0]] + self.tv[nloc[n0,1]])/2.
+			## Finish computation for the good normals
+			n = np.where(normal[:,-1] != 0)
+			prdz[n] = prdz[n]/-normal[n,-1]
 
 		else:
 			m, b = self.main2D(PrdPts, nppts, nloc)
@@ -600,8 +603,6 @@ class LNInterp(NNInterpBase):
 		if (self.dims > 2):
 			normal, prdtemp, pc = self.main(PrdPts, nppts, self.dims, nloc)
 			if (np.any(normal[:,-1]) == 0):
-				print 'ERROR: Dependent variable has infinite answers.'
-				print
 				return gradient
 			gradient = -normal[:,:-1]/normal[:,-1:]
 
@@ -681,12 +682,12 @@ class CNInterp(NNInterpBase):
 			orgneighs[t,:,:] = neighvals[t,neighvals[t,:,D].argsort(),:]
 		## Make some temporary variables
 		tprd = PrdPts.reshape(nppts,1,(self.dims-1))
-		podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])
+		podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])+0.00000000000001
 		## Gives the indices of the closest neighbors to each prdpt per dim.
 		cnd = np.argmin((np.abs(podiff)), axis=1)
 		## If the closest neighbor per dim is a smaller value, add 1.
-		cnd += np.ceil((podiff[anppts,cnd].real+0.00000000000001) / \
-				(np.abs(podiff[anppts,cnd].real*2)+0.00000000000001))
+		cnd += np.ceil((podiff[anppts,cnd].real) / \
+				(np.abs(podiff[anppts,cnd].real*2)))
 		## Stay in the range!
 		cnd[cnd == 0] = 1
 		cnd[cnd == N] = N-1
@@ -694,6 +695,9 @@ class CNInterp(NNInterpBase):
 		zu = orgneighs[anppts,cnd,-1]
 		zl = orgneighs[anppts,(cnd-1),-1]
 		ddiff = 1/(orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])
+		ddiff = (orgneighs[anppts,cnd,D]-orgneighs[anppts,(cnd-1),D])
+		ddiff[ddiff < 0.000000001] = podiff[:,(cnd-1)].real*2.
+		ddiff = 1./ddiff
 		diff = podiff[anppts,(cnd-1)] * ddiff
 
 		return zu, zl, diff, ddiff
@@ -793,18 +797,20 @@ class HNInterp(NNInterpBase):
 			orgneighs[t,:,:] = neighvals[t,neighvals[t,:,D].argsort(),:]
 		## Make some temporary variables
 		tprd = PrdPts.reshape(nppts,1,(self.dims-1))
-		podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])
+		podiff = np.subtract(tprd[:,:,D], orgneighs[:,:,D])+0.000000000001
 		## Gives the indices of the closest neighbors to each prdpt per dim.
 		cnd = np.argmin((np.abs(podiff)), axis=1)
 		## If the closest neighbor per dim is a smaller value, add 1.
 		cnd += np.ceil(podiff[anppts,cnd].real / \
-				np.abs(podiff[anppts,cnd].real*2))
+				np.abs((podiff[anppts,cnd].real)*2))
 		## Stay in the range!
 		cnd[cnd <= 1] = 2
 		cnd[cnd >= (N-1)] = N-2
 		
 		## Find location of value in min and max of neighvals to be used
-		ddiff = 1/(orgneighs[anppts,(cnd+u),D]-orgneighs[anppts,(cnd-l),D])
+		ddiff = (orgneighs[anppts,(cnd+u),D]-orgneighs[anppts,(cnd-l),D])
+		ddiff[ddiff < 0.000000001] = podiff[:,(cnd-l)].real*2.
+		ddiff = 1./ddiff
 		diff = podiff[anppts,(cnd-l)] * ddiff 
 
 		for n in range(4):
@@ -1089,17 +1095,17 @@ minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = 'Crate' # Problem type, options seen in organize inputs loop below
+problem = '5D4O' # Problem type, options seen in organize inputs loop below
 
 trnpoints = 10000  # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000  # Number of prediction points
 
-neighbors = 0 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
+neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
 comp = 2 # Type of CRBF used in the CR interpolation
-NumLeaves = 0 # Leaves of KD Tree, default of about 1 per 500 training points
+NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = False # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
 
@@ -1158,7 +1164,7 @@ tt = tight
 ## Extra Inputs
 allplot = False #For 2D, plot separate graphs for each interp
 erplot = False #Choose to plot error
-AbyT = 100 # Multilpier for actual to training data points
+AbyT = 1 # Multilpier for actual to training data points
 
 ## Create the Independent Data
 train = N_Data(minimum, maximum, trnpoints, pr, trndist, dim)
@@ -1459,7 +1465,7 @@ with open("RunError.txt", "a") as efile:
 	efile.write("\n")
 '''
 #pp.close()                             
-plt.show()                              
+#plt.show()                              
                                     
 ## Written Out =================================================================
                                         

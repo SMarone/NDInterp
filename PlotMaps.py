@@ -1,7 +1,7 @@
 from matplotlib import pylab 
 import numpy as np
 
-problemtype = 'WN'
+problemtype = 'HN'
 
 linecolors = [ 'red', 'green', 'blue', 'orange', 'magenta', 'cyan',
 	'saddlebrown', 'skyblue', 'olivedrab', 'yellowgreen', 'black' ]
@@ -247,23 +247,23 @@ def interpcheck():
 	for dep in range(3): 
 		if (problemtype == 'LN'):
 			trainInt = LNInterp(trnpts, trnvls[:,dep,:], NumLeaves)
-			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+			prdvls[:,dep, 0] =  \
 					trainInt(prdpts)
 		elif (problemtype == 'WN'):
 			trainInt = WNInterp(trnpts, trnvls[:,dep,:], NumLeaves)
-			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+			prdvls[:,dep, 0] =  \
 					trainInt(prdpts, neighbors, DistanceEffect)
 		elif (problemtype == 'CN'):
 			trainInt = CNInterp(trnpts, trnvls[:,dep,:], NumLeaves)
-			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+			prdvls[:,dep, 0] =  \
 					trainInt(prdpts, neighbors)
 		elif (problemtype == 'HN'):
 			trainInt = HNInterp(trnpts, trnvls[:,dep,:], NumLeaves)
-			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+			prdvls[:,dep, 0] =  \
 					trainInt(prdpts, neighbors, tension, bias, tight)
 		elif (problemtype == 'CR'):
 			trainInt = CRInterp(trnpts, trnvls[:,dep,:], neighbors, NumLeaves, comp)
-			prdvls[:,dep, 0], prdgrd[:,:,dep] =  \
+			prdvls[:,dep, 0] =  \
 					trainInt(prdpts)
 	prddata.append( \
 			unstructtolist( prdpts, prdvls, numpts, ilength, jlengths))
