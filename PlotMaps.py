@@ -137,15 +137,21 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 		if Veff != []:
 			if filled == 0:
 				pylab.contour(WC,PR,EFF,Veff)
-				pylab.colorbar(ticks=Veff)
+				cb = pylab.colorbar(ticks=Veff)
+				cb.ax.set_ylabel('Veff')
 			else:
 				pylab.contourf(WC,PR,EFF,Veff)
-				pylab.colorbar(ticks=Veff)
+				cb = pylab.colorbar(ticks=Veff)
+				cb.ax.set_ylabel('Veff')
 		else:
 			if filled == 0:
 				pylab.contour(WC,PR,EFF)
+				cb = pylab.colorbar()
+				cb.ax.set_ylabel('Eff')
 			else:
 				pylab.contourf(WC,PR,EFF)
+				cb = pylab.colorbar()
+				cb.ax.set_ylabel('Eff')
 
 		#  PLOT SPEED CONTOURS FOR BETA MAPS
 		if maptype == 'BETA':
@@ -296,8 +302,8 @@ for component in range(len(component_list)-1):
 			if (alpha!= 0):
 				pylab.figure()
 			mapname = 'Training Data'
-			plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay, 
-				axes, filled, show_lines, Vspd, Veff)
+			plot_compressor(mapname, maptype, mapdata, scaled_map, scalars,
+					overlay, axes, filled, show_lines, Vspd, Veff)
 			pylab.figure()
 			mapname = 'Predicted Data'
 			interpcheck()
