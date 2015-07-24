@@ -20,8 +20,9 @@ import sys, os
 ## This is an n-dimensional interpolation code.  More information can be found
 # at the end of the code along with the lines which run it.
 
-# Set Up Original Problem ======================================================
+# Local Methods ================================================================
  
+
 @contextmanager
 def suppress_stdout():
     with open(os.devnull, "w") as devnull:
@@ -93,6 +94,10 @@ def Solve(points, funct):
 		return
 	
 	return z
+
+
+# Local Data Class =============================================================
+
 
 class N_Data(object):
 	## Main data type with N dimension.  Only needed if you want to use the 
@@ -889,21 +894,93 @@ class HNInterp(NNInterpBase):
 
 class CRInterp(object):
 	## Compactly Supported Radial Basis Function
-	def FindR(self, npp, Tn, loc): 
+	
+	def FindR(self, npp, T, loc): 
 		R = np.zeros((npp, self.ntpts), dtype="complex")
 		## Choose type of CRBF R matrix
 		if (self.comp == 1):
-			## Comp #1
-			Cf = (1.-Tn)*(1.-Tn)*(1.-Tn)*(1.-Tn)*(1.-Tn)
-			Cb  = (8.+(40.*Tn)+(48.*Tn*Tn)+ \
-					  (72.*Tn*Tn*Tn)+(5.*Tn*Tn*Tn*Tn))
-
+			## Comp #1 - a 
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+			Cb  = (8.+(40.*T)+(48.*T*T)+ \
+					  (72.*T*T*T)+(5.*T*T*T*T))
 		elif (self.comp == 2):
 			## Comp #2
-			Cf = (1.-Tn)*(1.-Tn)*(1.-Tn)*(1.-Tn)*(1.-Tn)*(1.-Tn)
-			Cb = (6.+(36.*Tn)+(82.*Tn*Tn)+(72.*Tn*Tn*Tn)+ \
-						(30.*Tn*Tn*Tn*Tn)+(5.*Tn*Tn*Tn*Tn*Tn))
-
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+			Cb = (6.+(36.*T)+(82.*T*T)+(72.*T*T*T)+ \
+						(30.*T*T*T*T)+(5.*T*T*T*T*T))
+		elif (self.comp == 10):
+			# This starts the dk comps, here d=1, k=0
+			Cf = 1.-T
+			Cb = np.ones((len(T[:,0]),len(T[0,:])), dtype="complex")
+		elif (self.comp == 11):
+			Cf = (1.-T)*(1.-T)*(1.-T)/12.
+			Cb = 1.+(3.*T)
+		elif (self.comp == 12):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/840.
+			Cb = 3.+(15.*T)+(24.*T*T)
+		elif (self.comp == 13):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/151200.
+			Cb = 15.+(105.*T)+(285.*T*T)+(315.*T*T*T)
+		elif (self.comp == 14):	
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)/51891840.
+			Cb = 105.+(945.*T)+(3555.*T*T)+(6795.*T*T*T)+\
+					(5760.*T*T*T*T)
+		elif (self.comp == 30):
+			Cf = (1.-T)
+			Cb = (1.-T)
+		elif (self.comp == 31):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)/20.
+			Cb = 1.+(4.*T)
+		elif (self.comp == 32):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1680.
+			Cb = 3.+(18.*T)+(35.*T*T)
+		elif (self.comp == 33):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)/332640.
+			Cb = 15.+(120.*T)+(375.*T*T)+(480.*T*T*T)
+		elif (self.comp == 34):		
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)*(1.-T)/121080960.
+			Cb = (105.+(1050.*T)+(4410.*T*T)+(9450.*T*T*T)+\
+					(9009.*T*T*T*T))
+		elif (self.comp == 50):
+			Cf = (1.-T)*(1.-T)
+			Cb = (1.-T)
+		elif (self.comp == 51):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/30.
+			Cb = 1.+(5.*T)
+		elif (self.comp == 52):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/3024.
+			Cb = 3.+(21.*T)+(48.*T*T)
+		elif (self.comp == 53):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)/665280.
+			Cb = 15.+(135.*T)+(477.*T*T)+(693.*T*T*T)
+		elif (self.comp == 54):		
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/259459200.
+			Cb = (105.+(1155.*T)+(5355.*T*T)+(12705.*T*T*T)+\
+					(13440.*T*T*T*T))
+		elif (self.comp == 70):
+			Cf = (1.-T)*(1.-T)
+			Cb = (1.-T)*(1.-T)
+		elif (self.comp == 71):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/42.
+			Cb = 1.+(6.*T)
+		elif (self.comp == 72):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)/5040.
+			Cb = 3.+(24.*T)+(63.*T*T)
+		elif (self.comp == 73):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1235520.
+			Cb = 15.+(150.*T)+(591.*T*T)+(960.*T*T*T)
+		elif (self.comp == 74):
+			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/518918400.
+			Cb = (105.+(1260.*T)+(6390.*T*T)+(16620.*T*T*T)+\
+					(19305.*T*T*T*T))
 		for i in xrange(npp):
 			c = 0
 			for j in loc[i,:-1]:	
@@ -913,29 +990,87 @@ class CRInterp(object):
 		return R
 	
 	def FinddR(self, PrdPts, ploc, pdist):
-		Tp  = (pdist[:,:-1]/pdist[:,-1:])
+		T  = (pdist[:,:-1]/pdist[:,-1:])
 		## Solve for the gradient analytically
 		## The first quantity needed is dRp/dt
-		frntp = (1.-Tp)*(1.-Tp)*(1.-Tp)*(1.-Tp)
 		if (self.comp == 1):
-			dRp = frntp*((-5.*(8. + (40.*Tp) + (48.*Tp*Tp) + \
-								(72.*Tp*Tp*Tp) + (5.*Tp*Tp*Tp*Tp))) + \
-						((1.-Tp) * (40. + (96.*Tp) + \
-								(216.*Tp*Tp) + (20.*Tp*Tp*Tp))))
-
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)
+			dRp  = frnt*((-5.*(8. + (40.*T) + (48.*T*T) + \
+								(72.*T*T*T) + (5.*T*T*T*T))) + \
+						((1.-T) * (40. + (96.*T) + \
+								(216.*T*T) + (20.*T*T*T))))
 		elif (self.comp == 2):
-			dRp = frntp*(1.-Tp)*((-6. * (6. + (36.*Tp) + \
-								(82.*Tp*Tp) + (72.*Tp*Tp*Tp) + \
-								(30.*Tp*Tp*Tp*Tp) + (5.*Tp*Tp*Tp*Tp*Tp))) + \
-						((1.-Tp)) * (36. + (164.*Tp) + \
-								(216.*Tp*Tp) + (120.*Tp*Tp*Tp) + \
-								(25.*Tp*Tp*Tp*Tp)))
-
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+			dRp  = frnt*((-6. * (6. + (36.*T) + \
+								(82.*T*T) + (72.*T*T*T) + \
+								(30.*T*T*T*T) + (5.*T*T*T*T*T))) + \
+						((1.-T)) * (36. + (164.*T) + \
+								(216.*T*T) + (120.*T*T*T) + \
+								(25.*T*T*T*T)))
+		elif (self.comp == 10):
+			# This starts the dk comps(Wendland Functs), here d=1, k=0
+			dRp  = -1.
+		elif (self.comp == 11):
+			dRp  = -T*(1.-T)*(1.-T)
+		elif (self.comp == 12):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)/-20.
+			dRp  = frnt*(T+(4.*T*T))
+		elif (self.comp == 13):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-1680.
+			dRp  = frnt*((3.*T)+(18.*T*T)+(35.*T*T*T))
+		elif (self.comp == 14):		
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)/-22176.
+			dRp  = frnt*(T+(8.*T*T)+(25.*T*T*T)+(32.*T*T*T*T))
+		elif (self.comp == 30):
+			dRp  = -2.*(1-T)
+		elif (self.comp == 31):
+			dRp  = -T*(1.-T)*(1.-T)*(1.-T)
+		elif (self.comp == 32):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-30.
+			dRp  = frnt*(T+(5.*T*T))
+		elif (self.comp == 33):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-1008.
+			dRp  = frnt*(T+(7.*T*T)+(16.*T*T*T))
+		elif (self.comp == 34):		
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)*(1.-T)/-221760.
+			dRp  = frnt*((5.*T)+(45.*T*T)+(159.*T*T*T)+(231.*T*T*T*T))
+		elif (self.comp == 50):
+			dRp  = -3.*(1.-T)*(1.-T)	
+		elif (self.comp == 51):
+			dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+		elif (self.comp == 52):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-42.
+			dRp  = frnt*(T+(6.*T*T))
+		elif (self.comp == 53):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)/-1680.
+			dRp  = frnt*(T+(8.*T*T)+(21.*T*T*T))
+		elif (self.comp == 54):		
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)*(1.-T)*(1.-T)/-411840.
+			dRp  = frnt*((5.*T)+(50.*T*T)+(197.*T*T*T)+(320.*T*T*T*T))
+		elif (self.comp == 70):
+			dRp  = -4.*(1.-T)*(1.-T)*(1.-T)
+		elif (self.comp == 71):
+			dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+		elif (self.comp == 72):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-56.
+			dRp  = frnt*(T+(7.*T*T))
+		elif (self.comp == 73):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)*(1.-T)/-7920.
+			dRp  = frnt*((3.*T)+(27.*T*T)+(80.*T*T*T))
+		elif (self.comp == 74):
+			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+						 *(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-720720.
+			dRp  = frnt*((5.*T)+(55.*T*T)+(239.*T*T*T)+(429.*T*T*T*T))
 		## Now need dt/dx
 		xpi = np.subtract(PrdPts, self.tp[ploc[:,:-1],:])
 		xpm = PrdPts - self.tp[ploc[:,-1:],:]
-		dtx = (xpi-(Tp*Tp*xpm))/ \
-				(pdist[:,-1:,:]*pdist[:,-1:,:]*Tp)
+		dtx = (xpi-(T*T*xpm))/ \
+				(pdist[:,-1:,:]*pdist[:,-1:,:]*T)
 		## The gradient then is the summation across neighs of w*df/dt*dt/dx
 		return np.sum((dRp * dtx * self.weights[ploc[:,:-1]]), axis=1)
 
@@ -1032,11 +1167,15 @@ Dep - Dependent:   Dimensions which are a function of Ind
 
 	    \/\/ Method Breakdown \/\/
 
+# Local Methods ================================================================
+
 df suppress_stdout():
 df Solve(points, funct):		
 	rtrn z
 
 		\/\/ Class Breakdown \/\/
+
+# Local Data Class =============================================================
 
 clss N_Data(object):
 	df __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
@@ -1053,29 +1192,57 @@ clss N_Data(object):
 			   check=False, step=0.00000001, neighs=5, 
 			   DistEff=3, tension=0, bias=0, tight=False):
 
-clss InterpBase(object):
-	df __init__(self, TrnPts, TrnVals, NumLeaves=8):#, 
-	df FindNearNeighs(self, PrdPts, N=5): 
-		rtrn prdz, gradient, nppts, ndist, nloc
+# Interpolation Classes ========================================================
 
-clss LNInterp(InterpBase):
-	df __call__(self, PrdPts):
-		rtrn prdz, gradient
-	
-clas WNInterp(InterpBase):
-	df __call__(self, PrdPts, N=5, DistEff=3):
-		rtrn prdz, gradient
+clss NNInterpBase(object):
+	df __init__(self, TrnPts, TrnVals, NumLeaves=2):
 
-clss CNInterp(InterpBase):
-	df __call__(self, PrdPts, N=5):
-		rtrn prdz, gradient
+clss LNInterp(NNInterpBase):
+	df main(self, PrdPts, nppts, dims, nloc):
+		rtrn normal, prdtemp, pc
+	df main2D(self, PrdPts, nppts, nloc):
+		rtrn m, b
+	df __call__(self, PredPoints):
+		rtrn predz
+	df gradient(self, PredPoints):
+		rtrn grad
 
-clss HNInterp(InterpBase):
-	df HermFunctArr(self, y, mu, dmu, tension, bias):
-		rtrn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2]), \
-				((dmu*(b0*y[:,1]+b1*m0+b2*m1+b3*y[:,2]))/(self.dims-1)).real
-	df __call__(self, PrdPts, N=5, tension=0, bias=0, tight=False):
-		rtrn prdz, gradient
+clss WNInterp(NNInterpBase):
+	df __call__(self, PredPoints, N=5, DistEff=3):
+		rtrn predz
+	df gradient(self, PredPoints, N=5, DistEff=3):
+		rtrn grad
+
+clss CNInterp(NNInterpBase):
+	df main(self, PrdPts, nppts, D, N, neighvals):	
+		rtrn zu, zl, diff, ddiff
+	df __call__(self, PredPoints, N=5):
+		rtrn predz
+	df gradient(self, PredPoints, N=5):
+		rtrn grad
+
+clss HNInterp(NNInterpBase):
+	df HermFunctRes(self, y, mu, tension, bias):
+		rtrn (a0*y[:,1] + a1*m0 + a2*m1 + a3*y[:,2])
+	df HermFunctGrad(self, y, mu, dmu, tension, bias):
+		rtrn ((dmu*(b0*y[:,1]+b1*m0+b2*m1+b3*y[:,2]))/(self.dims-1)).real
+	df main(self, PrdPts, nppts, D, N, u, l, neighvals):
+		rtrn y, diff, ddiff
+	df __call__(self, PredPoints, N=5, tension=0, bias=0, tight=False):
+		rtrn predz
+	df gradient(self, PredPoints, N=5, tension=0, bias=0, tight=False):
+		rtrn grad
+
+clss CRInterp(object):
+	df FindR(self, npp, T, loc): 
+		rtrn R
+	df FinddR(self, PrdPts, ploc, pdist):
+		rtrn np.sum((dRp * dtx * self.weights[ploc[:,:-1]]), axis=1)
+	df __init__(self, TrnPts, TrnVals, N=5, NumLeaves=2, comp=2):
+	df __call__(self, PredPoints):
+		rtrn predz
+	df gradient(self, PredPoints):
+		rtrn grad
 
 Note - some vowels removed to ensure vim friendliness.
 '''
@@ -1095,7 +1262,7 @@ minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = '5D4O' # Problem type, options seen in organize inputs loop below
+problem = 'Crate' # Problem type, options seen in organize inputs loop below
 
 trnpoints = 10000  # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000  # Number of prediction points
@@ -1104,7 +1271,7 @@ neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
-comp = 2 # Type of CRBF used in the CR interpolation
+comp = 34 # Type of CRBF used in the CR interpolation
 NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = False # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
@@ -1465,7 +1632,7 @@ with open("RunError.txt", "a") as efile:
 	efile.write("\n")
 '''
 #pp.close()                             
-#plt.show()                              
+plt.show()                              
                                     
 ## Written Out =================================================================
                                         
