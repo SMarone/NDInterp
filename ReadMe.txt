@@ -33,7 +33,7 @@ Comp - This determines the type of function to use for the CR scheme.  -1 and -2
 
 The structures for the basic setup and query of the interpolation methods is desribed below.  If a section has <> around it, that can be changed to alter the results or rename a variable.
 
-Setup Interpolation method:
+Setup Interpolation Method:
 
 <Interpolator> = <InterpScheme>Interp(<trainpoints>, <trainvals>, <numberofleaves>,**)
 
@@ -45,6 +45,8 @@ Setup Interpolation method:
 
 ** Note that the CR interpolation has optional arguments of the number of neighbors and the comp.
 
+Query Interpolation Method for Dependent Values:
+
 <predvals> = <Interpolator>(<predpoints>, **)
 
 	predvals - The dependent dimension values of the prediction points that were solved for.  They are in the array shape of (<#ofpredictionpoints>,1).
@@ -55,6 +57,8 @@ Setup Interpolation method:
 WN - number of neighbors, distance effect
 CN - number of neighbors
 HN - number of neighbors, tension, bias, tight
+
+Query Interpolation Method for Gradient Values:
 
 <predgradients> = <Interpolator>.gradient(<predpoints>, **)
 
