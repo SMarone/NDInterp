@@ -2,6 +2,7 @@ import numpy as np
 from  scipy import spatial
 from scipy.sparse import csc_matrix
 import scipy.sparse.linalg as spsl 
+import scipy.interpolate as interp
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import time
@@ -21,10 +22,17 @@ import sys, os
 # at the end of the code along with the lines which run it.
 
 # Local Methods ================================================================
- 
+'''
+The Methods and functions in this section of the code are here in order to 
+have an easy reference to change the test problems in this code.  This 
+entire section can be removed if these interpolation routines are being 
+integrated into another code.
+'''
+
 
 @contextmanager
 def suppress_stdout():
+	## This function just suppresses outputs
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
@@ -97,14 +105,20 @@ def Solve(points, funct):
 
 
 # Local Data Class =============================================================
+'''
+The Methods and functions in this section of the code are here in order to 
+easily setup and test data that might resemble good cases the interpolators
+will run.  This entire section is unnecesary when wrapping the interpolation
+classes into another code.
+'''
 
 
 class N_Data(object):
 	## Main data type with N dimension.  Only needed if you want to use the 
 	# example functions, check for error, or plot.
 	def __init__(self, mini, maxi, numpts, funct='PW', dtype='rand', dims=3):
-		## The funct is Crate or PW for Piecewise.
-		## The dtype is cart for cartesian or rand for random
+		## For funct possibilities, refer to the Solve function above
+		## Dtype: cart for cartesian, LH for latin h-cube, rand for random
 		self.funct = funct
 		self.dtype = dtype
 		self.dims = dims
@@ -126,7 +140,7 @@ class N_Data(object):
 				self.points = np.sort(self.points, axis=0)
 			'''
 			if (funct == 'PW'):
-				## This ensures points exist on discontinuities
+				## This ensures points exist on discontinuities for piecewise
 				self.points[0,0] = mini/2
 				self.points[1,0] = mini
 				self.points[2,0] = 0
@@ -160,15 +174,8 @@ class N_Data(object):
 				self.points = np.transpose(np.array([x.flatten()]))
 			else:
 				print 'Can not currently do cartesian in any dimension \
-						except for 2 and 3.'
+						except for 2 and 3. Blame meshgrid.'
 				raise SystemExit
-			'''
-			## Could not figure out why np would not do a meshgrid in N dims
-			## Defaults for crate: mini=-512,maxi=512,numpts=81
-			stp = (maxi-mini)/(np.sqrt(numpts)-1)
-			xm = np.meshgrid(*[np.arange(mini,(maxi+stp),stp) for \
-					d in range(dims)], sparse=False, indexing='ij')
-			'''
 		else:
 			print 'Distribution type not found.'
 			raise SystemExit
@@ -181,20 +188,20 @@ class N_Data(object):
 		self.gradient=gradient
 
 	def CreateDep(self):
-		## This not only creates z but the data subtype as well
+		## This creates the dependant from the specified function type
 		print '**Creating Dependent Data from Problem Library**'
 		print
 		z = Solve(self.points,self.funct)	
 		self.values = z[:,np.newaxis]
 
 	def PlotResults(self, title, pltfile='None'):
-		## Plots the value results of a 3 dimensional problem
-
+		## Plots the value results of a 2 or 3 dimensional problem
 		## Ensure points and values have been created
 		try:
 			self.values
 		except NameError:
 			print 'Values have not been set.'
+			print
 			return
 
 		fig = plt.figure()
@@ -214,12 +221,18 @@ class N_Data(object):
 			ax.set_ylabel('Y - Independent Variable')
 			ax.set_zlabel('Z - Dependent Variable')
 			ax.set_zticklabels([])
+
+			## These adjustments are to improve view of the 3D problems when
+			# the maximum and minimum are set to 500 and -500 for each 
+			# independent dimension respectively.
+			'''
 			if (self.funct == 'PW'):
 				ax.set_zlim([-5000,5000])
 			elif (self.funct == 'Crate'):
 				ax.set_zlim([-1000,1000])
 			elif (self.funct == 'Plane'):
 				ax.set_zlim([-300000,300000])
+			'''
 		elif (self.dims == 2):
 			x = self.points[:,0].flatten()
 			y = self.values[:,0].flatten()
@@ -232,16 +245,18 @@ class N_Data(object):
 		else:
 			print 'Unable to plot this dimension of points.'
 			print
+			return
 		if (pltfile != 'None'):
 			pltfile.savefig()
 
 	def PlotPoints(self, title, pltfile='None'):
 		## Dim-1 plot of point locations for visualization
-		## Ensure points have been created
 		try:
+			## Ensure points have been created
 			self.points
 		except NameError:
 			print 'Points have not been set.'
+			print
 			return
 
 		if (self.dims == 3):
@@ -258,9 +273,17 @@ class N_Data(object):
 						self.points[:,2], c=c, marker=m)
 			fig.suptitle('%s Point Locations' % title, 
 							fontsize=14, fontweight='bold')
+			ax.set_ylabel('X Value')
 			ax.set_ylabel('Y Value')
 			ax.set_zlabel('Z Value')
 		elif (self.dims == 2):
+			zeros = np.zeros((len(self.points[:,0])), dtype='float')
+			fig = plt.figure()
+			plt.scatter(self.points[:,0], zeros)
+			fig.suptitle('%s Point Locations' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('X Value')
+			plt.ylabel('')
 			return
 		else:
 			print 'Unable to plot this dimension of points.'
@@ -272,9 +295,8 @@ class N_Data(object):
 	def FindError(self, title, pltfile='None', plot=True, 
 				  check=False, step=0.00000001):
 		## Find and plot error of the found values
-		
-		## Ensure points and values have been created
 		try:
+			## Ensure points and values have been created
 			self.values
 		except NameError:
 			print 'Values have not been set.'
@@ -283,7 +305,6 @@ class N_Data(object):
 		vals = self.values.flatten()
 		loc = 1+np.arange(len(vals), dtype='float')
 		zc = Solve(self.points,self.funct)	
-		
 		error = abs((zc-vals)/(zc+0.000000000001)) * 100
 		avg = np.average(error)
 		
@@ -383,8 +404,10 @@ class N_Data(object):
 		loc = 1+np.arange(len(self.values), dtype='float')
 		## Find and plot error of the found values
 		
-		## Ensure points and values have been created
 		if (np.all(self.gradient) == 0):
+			## If the gradient is empty, just leave.  Ain't got time for that.
+			print 'Gradient does not have a solution.'
+			print
 			return
 
 		PrdiPts = np.empty((len(self.points[:,0]),self.dims-1), dtype='complex')
@@ -395,6 +418,7 @@ class N_Data(object):
 			PrdiPts[:,:].imag = 0.
 			PrdiPts[:,D] = self.points[:,D] + (step*1.0j)
 			with suppress_stdout():
+				## Redo interpolation with complex addition but suppress output
 				if (itype == 'LN'):
 					zi = Interp(PrdiPts)
 				elif (itype == 'WN'):
@@ -406,6 +430,7 @@ class N_Data(object):
 				elif (itype == 'CR'):
 					zi = Interp(PrdiPts)
 			gradi[:,D] = zi.imag/ step
+		## Compare the difference in complex addition with the gradient answer
 		gerror = abs((gradi-self.gradient)/(gradi+0.000000000000000001)) * 100.
 		gerror = np.sum(gerror, axis=1)/(self.dims-1)
 		gavg = np.average(gerror)
@@ -463,6 +488,7 @@ class N_Data(object):
 	def PlotAll(self, title, Interp, itype, pltfile='None', erplot=True, 
 			   check=False, step=0.00000001, neighs=5, 
 			   DistEff=3, tension=0, bias=0, tight=False):
+		## This routine runs through all checks and plotting options/
 		self.PlotResults(title,pltfile)
 		self.PlotPoints(title,pltfile)
 		self.FindError(title,pltfile,erplot,check,step)
@@ -471,6 +497,14 @@ class N_Data(object):
 
 
 # Interpolation Classes ========================================================
+'''
+The classes inside this section are the main parts of this code.  Below are
+the interpolation methods all individually defined and ready to use.  Most
+of the classes are children the the first class below, NNInterpBase. All of
+the methods use a KD-Tree to sort the data; this improves the cost of each
+query done with them.  To query for dependent answers, call methods are set.
+To query for gradients, self.gradient methods are set.
+'''
 
 
 class NNInterpBase(object):
@@ -485,35 +519,25 @@ class NNInterpBase(object):
 		self.tvr = (np.amax(TrnVals, axis=0) - self.tvm)
 
 		## This prevents against colinear data (range = 0)
-		#self.tpr[self.tpr == 0] = 1
-		#self.tvr[self.tvr == 0] = 1
-		self.tpm = 0
-		self.tvm = 0
-		self.tpr = 1
-		self.tvr = 1
+		self.tpr[self.tpr == 0] = 1
+		self.tvr[self.tvr == 0] = 1
 
 		## Normalize all points
 		self.tp = (TrnPts - self.tpm) / self.tpr
 		self.tv = (TrnVals - self.tvm) / self.tvr
 
+		## Set important variables
 		self.dims = len(TrnPts[0,:]) + 1
 		self.ntpts = len(TrnPts[:,0])
-
-		## Uses a KD Tree to set the distances, locations, and values 
-		# of the closest neighbors to each point in the 
-
 
 		print 'Interpolation Input Values'
 		print '-KDTree Leaves:', NumLeaves
 		print '-Number of Training Points:', self.ntpts
 		print
-		## Make into training data into a Tree
+
+		## Make training data into a Tree
 		leavesz = math.ceil(self.ntpts/(NumLeaves+0.00000000000001))
 		KData = spatial.KDTree(self.tp,leafsize=leavesz)
-
-		## KData query takes (data, #ofneighbors) to determine closest 
-		# training points to predicted data
-
 		self.KData = KData
 
 class LNInterp(NNInterpBase):
@@ -533,7 +557,7 @@ class LNInterp(NNInterpBase):
 			                       self.tv[nloc].reshape(nppts,dims,1)),
 			                       axis=2)
 			## Set the prddata to a temporary array so it has the same
-			# dimensions as the training data with z as 0 for now
+			# dimensions as the training data with the dependant as 0 
 			prdtemp = np.concatenate((PrdPts, \
 									np.zeros((nppts,1),dtype='float')), 1)
 			
@@ -542,17 +566,18 @@ class LNInterp(NNInterpBase):
 			    ## Creates array[neighbor, dimension] from NN results
 			    nvect[:,n,:] = trnd[:,(n+1),:] - trnd[:,n,:]
 			
-			## Nvec used below to in an exterior product.
+			## Nvec used below to finish a hodge star product 
+			# (in 3D essentially a cross product).
 			normal = np.prod(nvect[:,r,da], axis=2) - \
 					 np.prod(nvect[:,r,db], axis=2)
 				
-			## The pc is the constant of the n dimensional plane.
-			## It uses the point which is from the closest neighbor
+			## Use the point of the closest neighbor to 
+			# solve for pc - the constant of the n-dimensional plane.
 			pc = np.einsum('ij, ij->i',trnd[:,0,:],normal)
 			return normal, prdtemp, pc
 
 	def main2D(self, PrdPts, nppts, nloc):
-				## Need to find a tangent instead of a normal, y=mx+b
+			## Need to find a tangent instead of a normal, y=mx+b
 			d = self.tp[nloc[:,1],0] - self.tp[nloc[:,0],0]
 			d[d < 0.000000000001] = 100000000000000000000
 			m = (self.tv[nloc[:,1],0] - self.tv[nloc[:,0],0]) / d
@@ -566,7 +591,9 @@ class LNInterp(NNInterpBase):
 		nppts    = len(PrdPts[:,0])
 		## Linear interp only uses as many neighbors as it has dimensions
 		dims = self.dims
-		## Find them neigbors
+		## Find them neigbors.  Linear only uses #neighs=#dims
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
 		ndist, nloc = self.KData.query(PrdPts ,self.dims)
 		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
 		print '-Number of Predicted Points:', nppts
@@ -580,7 +607,7 @@ class LNInterp(NNInterpBase):
 			normal, prdtemp, pc = self.main(PrdPts, nppts, self.dims, nloc)
 			## Set all prdz from values on plane
 			prdz = (np.einsum('ij, ij->i',prdtemp,normal)-pc)
-			## Check to see if there are any colinear points amd replace them
+			## Check to see if there are any colinear points and replace them
 			n0 = np.where(normal[:,-1] == 0)
 			prdz[n0] = (self.tv[nloc[n0,0]] + self.tv[nloc[n0,1]])/2.
 			## Finish computation for the good normals
@@ -595,8 +622,8 @@ class LNInterp(NNInterpBase):
 		return predz
 
 	def gradient(self, PredPoints):
-		## This method uses linear interpolation by defining a plane with
-		# a set number of nearest neighbors to the predicted
+		## Extra method to find the gradient at each location of a set of 
+		# supplied predicted points.
 		PrdPts = (PredPoints - self.tpm) / self.tpr
 		nppts    = len(PrdPts[:,0])
 		gradient = np.zeros((nppts, self.dims-1), dtype="float")
@@ -623,6 +650,8 @@ class WNInterp(NNInterpBase):
 		PrdPts = (PredPoints - self.tpm) / self.tpr
 		nppts    = len(PrdPts[:,0])
 		## Find them neigbors
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
 		ndist, nloc = self.KData.query(PrdPts ,N)
 		print 'Weighted Nearest Neighbors (WN) KDTree Results'
 		print '-Number of Predicted Points:', nppts
@@ -697,11 +726,12 @@ class CNInterp(NNInterpBase):
 		cnd[cnd == 0] = 1
 		cnd[cnd == N] = N-1
 
+		## Mark upper and lower closest neighbors
 		zu = orgneighs[anppts,cnd,-1]
 		zl = orgneighs[anppts,(cnd-1),-1]
-		ddiff = 1/(orgneighs[anppts,cnd,D] - orgneighs[anppts,(cnd-1),D])
+		## Need to ensure no colinear data causes a divide by 0
 		ddiff = (orgneighs[anppts,cnd,D]-orgneighs[anppts,(cnd-1),D])
-		ddiff[ddiff < 0.000000001] = podiff[:,(cnd-1)].real*2.
+		ddiff[ddiff < 0.00000000001] = podiff[:,(cnd-1)].real*2.
 		ddiff = 1./ddiff
 		diff = podiff[anppts,(cnd-1)] * ddiff
 
@@ -711,6 +741,8 @@ class CNInterp(NNInterpBase):
 		PrdPts = (PredPoints - self.tpm) / self.tpr
 		nppts    = len(PrdPts[:,0])
 		## Find them neigbors
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
 		ndist, nloc = self.KData.query(PrdPts ,N)
 		
 		print 'Cosine Nearest Neighbors (CN) KDTree Results'
@@ -727,9 +759,11 @@ class CNInterp(NNInterpBase):
 		tprdz = np.zeros((nppts), dtype='complex')
 		for D in range(self.dims-1):
 			zu, zl, diff, ddiff = self.main(PrdPts, nppts, D, N, neighvals)		
+			## Take info from main function and insert into the cosine funct.
 			mu2 = (1-np.cos(np.pi*diff))/2
 			tprdz += zu * mu2 + zl * (1-mu2)
 
+		## Average found solutions and remove normalization
 		predz = ((tprdz/(D+1)) * self.tvr) + self.tvm
 		return predz
 
@@ -747,9 +781,11 @@ class CNInterp(NNInterpBase):
 
 		for D in range(self.dims-1):
 			zu, zl, diff, ddiff = self.main(PrdPts, nppts, D, N, neighvals)		
+			## Take info from main function and solve for grad of cosine funct.
 			gradient[:,D] = (np.pi/2)*(zu-zl)*ddiff* \
 					np.sin(np.pi*diff.real)/(self.dims-1) 
 
+		## Remove normalization
 		grad = gradient * (self.tvr/self.tpr)
 		return grad
 
@@ -759,7 +795,7 @@ class HNInterp(NNInterpBase):
 	def HermFunctRes(self, y, mu, tension, bias):
 		## Should  have 4 neighbor values (y) and percent distance along line 
 		# from y1 and y2 to get the wanted value (mu).  Bias and tension 
-		# are optional values.
+		# are optional values.  This one returns the dependent values.
 		mu2 = mu * mu
 		mu3 = mu2 * mu
 	
@@ -778,14 +814,15 @@ class HNInterp(NNInterpBase):
 	def HermFunctGrad(self, y, mu, dmu, tension, bias):
 		## Should  have 4 neighbor values (y) and percent distance along line 
 		# from y1 and y2 to get the wanted value (mu).  Bias and tension 
-		# are optional values.
+		# are optional values. This one returns the gradient values.
 		mu2 = mu * mu
 	
 		m0  = (y[:,1]-y[:,0])*(1+bias)*(1-tension)/2
 		m0 += (y[:,2]-y[:,1])*(1-bias)*(1-tension)/2
 		m1  = (y[:,2]-y[:,1])*(1+bias)*(1-tension)/2
 		m1 += (y[:,3]-y[:,2])*(1-bias)*(1-tension)/2
-
+		
+		## Derivatives of the 'a's
 		b0 =  6*mu2 - 6*mu
 		b1 =  3*mu2 - 4*mu + 1
 		b2 =  3*mu2 - 2*mu
@@ -814,6 +851,7 @@ class HNInterp(NNInterpBase):
 		
 		## Find location of value in min and max of neighvals to be used
 		ddiff = (orgneighs[anppts,(cnd+u),D]-orgneighs[anppts,(cnd-l),D])
+		## Avoid colinear causing /0
 		ddiff[ddiff < 0.000000001] = podiff[:,(cnd-l)].real*2.
 		ddiff = 1./ddiff
 		diff = podiff[anppts,(cnd-l)] * ddiff 
@@ -821,6 +859,7 @@ class HNInterp(NNInterpBase):
 		for n in range(4):
 			## Only need 4 inputs.  Would like to remove this sometime
 			y[:,n] = orgneighs[anppts,(cnd-2+n),-1]
+
 		return y, diff, ddiff
 
 	def __call__(self, PredPoints, N=5, tension=0, bias=0, tight=False):
@@ -837,9 +876,12 @@ class HNInterp(NNInterpBase):
 			# but very badly with larger problems
 			u -= 1
 			l -= 1
+		if (N < 5):
 			## Hermite requires at least 5 neighbors
 			N = 5
 		## Find them neigbors
+		## KData query takes (data, #ofneighbors) to determine closest 
+		# training points to predicted data
 		ndist, nloc = self.KData.query(PrdPts ,N)
 
 		print 'Hermite Nearest Neighbors (HN) KDTree Results'
@@ -856,8 +898,10 @@ class HNInterp(NNInterpBase):
 
 		for D in range(self.dims-1):
 			y, diff, ddiff = self.main(PrdPts, nppts, D, N, u, l, neighvals)
+			## Find necessary values and put into the Hermite function
 			tprdz += self.HermFunctRes(y,diff,tension,bias)
 
+		## Average found solutions and remove normalization
 		predz = ((tprdz/(D+1)) * self.tvr) + self.tvm
 		return predz
 
@@ -875,6 +919,7 @@ class HNInterp(NNInterpBase):
 			# but very badly with larger problems
 			u -= 1
 			l -= 1
+		if (N < 5):
 			## Hermite requires at least 5 neighbors
 			N = 5
 		## Find them neigbors
@@ -887,100 +932,112 @@ class HNInterp(NNInterpBase):
 
 		for D in range(self.dims-1):
 			y, diff, ddiff = self.main(PrdPts, nppts, D, N, u, l, neighvals)
+			## Find necessary variables and throw into the Hermite funct.
 			gradient[:,D] =	self.HermFunctGrad(y,diff,ddiff,tension,bias)
 
+		## Remove normalization
 		grad = gradient * (self.tvr/self.tpr)
 		return grad
 
 class CRInterp(object):
 	## Compactly Supported Radial Basis Function
-	
 	def FindR(self, npp, T, loc): 
 		R = np.zeros((npp, self.ntpts), dtype="complex")
 		## Choose type of CRBF R matrix
-		if (self.comp == 1):
+		if (self.comp == -1):
 			## Comp #1 - a 
 			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
 			Cb  = (8.+(40.*T)+(48.*T*T)+ \
 					  (72.*T*T*T)+(5.*T*T*T*T))
-		elif (self.comp == 2):
+		elif (self.comp == -2):
 			## Comp #2
 			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
 			Cb = (6.+(36.*T)+(82.*T*T)+(72.*T*T*T)+ \
 						(30.*T*T*T*T)+(5.*T*T*T*T*T))
-		elif (self.comp == 10):
-			# This starts the dk comps, here d=1, k=0
-			Cf = 1.-T
-			Cb = np.ones((len(T[:,0]),len(T[0,:])), dtype="complex")
-		elif (self.comp == 11):
-			Cf = (1.-T)*(1.-T)*(1.-T)/12.
-			Cb = 1.+(3.*T)
-		elif (self.comp == 12):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/840.
-			Cb = 3.+(15.*T)+(24.*T*T)
-		elif (self.comp == 13):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/151200.
-			Cb = 15.+(105.*T)+(285.*T*T)+(315.*T*T*T)
-		elif (self.comp == 14):	
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)/51891840.
-			Cb = 105.+(945.*T)+(3555.*T*T)+(6795.*T*T*T)+\
-					(5760.*T*T*T*T)
-		elif (self.comp == 30):
-			Cf = (1.-T)
-			Cb = (1.-T)
-		elif (self.comp == 31):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)/20.
-			Cb = 1.+(4.*T)
-		elif (self.comp == 32):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1680.
-			Cb = 3.+(18.*T)+(35.*T*T)
-		elif (self.comp == 33):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)/332640.
-			Cb = 15.+(120.*T)+(375.*T*T)+(480.*T*T*T)
-		elif (self.comp == 34):		
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)*(1.-T)/121080960.
-			Cb = (105.+(1050.*T)+(4410.*T*T)+(9450.*T*T*T)+\
-					(9009.*T*T*T*T))
-		elif (self.comp == 50):
-			Cf = (1.-T)*(1.-T)
-			Cb = (1.-T)
-		elif (self.comp == 51):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/30.
-			Cb = 1.+(5.*T)
-		elif (self.comp == 52):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/3024.
-			Cb = 3.+(21.*T)+(48.*T*T)
-		elif (self.comp == 53):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)/665280.
-			Cb = 15.+(135.*T)+(477.*T*T)+(693.*T*T*T)
-		elif (self.comp == 54):		
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/259459200.
-			Cb = (105.+(1155.*T)+(5355.*T*T)+(12705.*T*T*T)+\
-					(13440.*T*T*T*T))
-		elif (self.comp == 70):
-			Cf = (1.-T)*(1.-T)
-			Cb = (1.-T)*(1.-T)
-		elif (self.comp == 71):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/42.
-			Cb = 1.+(6.*T)
-		elif (self.comp == 72):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)/5040.
-			Cb = 3.+(24.*T)+(63.*T*T)
-		elif (self.comp == 73):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1235520.
-			Cb = 15.+(150.*T)+(591.*T*T)+(960.*T*T*T)
-		elif (self.comp == 74):
-			Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/518918400.
-			Cb = (105.+(1260.*T)+(6390.*T*T)+(16620.*T*T*T)+\
-					(19305.*T*T*T*T))
+		else:
+			## The above options did not specify a dimensional requirement
+			# in the paper found but the rest are said to only be guaranteed
+			# as positive definite iff the dimensional requirements are.
+			# Because of this, the user can select 0 through 4 to adjust to a 
+			# level of order trying to be attained.
+			if (self.dims <= 2):
+				if (self.comp == 0):
+					# This starts the dk comps, here d=1, k=0
+					Cf = 1.-T
+					Cb = np.ones((len(T[:,0]),len(T[0,:])), dtype="complex")
+				elif (self.comp == 1):
+					Cf = (1.-T)*(1.-T)*(1.-T)/12.
+					Cb = 1.+(3.*T)
+				elif (self.comp == 2):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/840.
+					Cb = 3.+(15.*T)+(24.*T*T)
+				elif (self.comp == 3):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/151200.
+					Cb = 15.+(105.*T)+(285.*T*T)+(315.*T*T*T)
+				elif (self.comp == 4):	
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)/51891840.
+					Cb = 105.+(945.*T)+(3555.*T*T)+(6795.*T*T*T)+\
+							(5760.*T*T*T*T)
+			elif (self.dims <= 4):
+				if (self.comp == 0):
+					Cf = (1.-T)
+					Cb = (1.-T)
+				elif (self.comp == 1):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)/20.
+					Cb = 1.+(4.*T)
+				elif (self.comp == 2):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1680.
+					Cb = 3.+(18.*T)+(35.*T*T)
+				elif (self.comp == 3):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)/332640.
+					Cb = 15.+(120.*T)+(375.*T*T)+(480.*T*T*T)
+				elif (self.comp == 4):		
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)*(1.-T)/121080960.
+					Cb = (105.+(1050.*T)+(4410.*T*T)+(9450.*T*T*T)+\
+							(9009.*T*T*T*T))
+			elif (self.dims <= 6):
+				if (self.comp == 0):
+					Cf = (1.-T)*(1.-T)
+					Cb = (1.-T)
+				elif (self.comp == 1):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/30.
+					Cb = 1.+(5.*T)
+				elif (self.comp == 2):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/3024.
+					Cb = 3.+(21.*T)+(48.*T*T)
+				elif (self.comp == 3):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)/665280.
+					Cb = 15.+(135.*T)+(477.*T*T)+(693.*T*T*T)
+				elif (self.comp == 4):		
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/259459200.
+					Cb = (105.+(1155.*T)+(5355.*T*T)+(12705.*T*T*T)+\
+							(13440.*T*T*T*T))
+			else:
+				## Although not listed, this is ideally for 8 dim or less
+				if (self.comp == 0):
+					Cf = (1.-T)*(1.-T)
+					Cb = (1.-T)*(1.-T)
+				elif (self.comp == 1):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/42.
+					Cb = 1.+(6.*T)
+				elif (self.comp == 2):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)/5040.
+					Cb = 3.+(24.*T)+(63.*T*T)
+				elif (self.comp == 3):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)*(1.-T)/1235520.
+					Cb = 15.+(150.*T)+(591.*T*T)+(960.*T*T*T)
+				elif (self.comp == 4):
+					Cf = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/518918400.
+					Cb = (105.+(1260.*T)+(6390.*T*T)+(16620.*T*T*T)+\
+							(19305.*T*T*T*T))
 		for i in xrange(npp):
 			c = 0
 			for j in loc[i,:-1]:	
@@ -993,13 +1050,13 @@ class CRInterp(object):
 		T  = (pdist[:,:-1]/pdist[:,-1:])
 		## Solve for the gradient analytically
 		## The first quantity needed is dRp/dt
-		if (self.comp == 1):
+		if (self.comp == -1):
 			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)
 			dRp  = frnt*((-5.*(8. + (40.*T) + (48.*T*T) + \
 								(72.*T*T*T) + (5.*T*T*T*T))) + \
 						((1.-T) * (40. + (96.*T) + \
 								(216.*T*T) + (20.*T*T*T))))
-		elif (self.comp == 2):
+		elif (self.comp == -2):
 			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
 			dRp  = frnt*((-6. * (6. + (36.*T) + \
 								(82.*T*T) + (72.*T*T*T) + \
@@ -1007,65 +1064,73 @@ class CRInterp(object):
 						((1.-T)) * (36. + (164.*T) + \
 								(216.*T*T) + (120.*T*T*T) + \
 								(25.*T*T*T*T)))
-		elif (self.comp == 10):
-			# This starts the dk comps(Wendland Functs), here d=1, k=0
-			dRp  = -1.
-		elif (self.comp == 11):
-			dRp  = -T*(1.-T)*(1.-T)
-		elif (self.comp == 12):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)/-20.
-			dRp  = frnt*(T+(4.*T*T))
-		elif (self.comp == 13):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-1680.
-			dRp  = frnt*((3.*T)+(18.*T*T)+(35.*T*T*T))
-		elif (self.comp == 14):		
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)/-22176.
-			dRp  = frnt*(T+(8.*T*T)+(25.*T*T*T)+(32.*T*T*T*T))
-		elif (self.comp == 30):
-			dRp  = -2.*(1-T)
-		elif (self.comp == 31):
-			dRp  = -T*(1.-T)*(1.-T)*(1.-T)
-		elif (self.comp == 32):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-30.
-			dRp  = frnt*(T+(5.*T*T))
-		elif (self.comp == 33):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-1008.
-			dRp  = frnt*(T+(7.*T*T)+(16.*T*T*T))
-		elif (self.comp == 34):		
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)*(1.-T)/-221760.
-			dRp  = frnt*((5.*T)+(45.*T*T)+(159.*T*T*T)+(231.*T*T*T*T))
-		elif (self.comp == 50):
-			dRp  = -3.*(1.-T)*(1.-T)	
-		elif (self.comp == 51):
-			dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)
-		elif (self.comp == 52):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-42.
-			dRp  = frnt*(T+(6.*T*T))
-		elif (self.comp == 53):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)/-1680.
-			dRp  = frnt*(T+(8.*T*T)+(21.*T*T*T))
-		elif (self.comp == 54):		
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)*(1.-T)*(1.-T)/-411840.
-			dRp  = frnt*((5.*T)+(50.*T*T)+(197.*T*T*T)+(320.*T*T*T*T))
-		elif (self.comp == 70):
-			dRp  = -4.*(1.-T)*(1.-T)*(1.-T)
-		elif (self.comp == 71):
-			dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
-		elif (self.comp == 72):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-56.
-			dRp  = frnt*(T+(7.*T*T))
-		elif (self.comp == 73):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)*(1.-T)/-7920.
-			dRp  = frnt*((3.*T)+(27.*T*T)+(80.*T*T*T))
-		elif (self.comp == 74):
-			frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
-						 *(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-720720.
-			dRp  = frnt*((5.*T)+(55.*T*T)+(239.*T*T*T)+(429.*T*T*T*T))
+		else:
+			## Start dim dependent comps, review first occurance for more info
+			if (self.dims <= 2):
+				if (self.comp == 0):
+					# This starts the dk comps(Wendland Functs), here d=1, k=0
+					dRp  = -1.
+				elif (self.comp == 1):
+					dRp  = -T*(1.-T)*(1.-T)
+				elif (self.comp == 2):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)/-20.
+					dRp  = frnt*(T+(4.*T*T))
+				elif (self.comp == 3):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-1680.
+					dRp  = frnt*((3.*T)+(18.*T*T)+(35.*T*T*T))
+				elif (self.comp == 4):		
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)/-22176.
+					dRp  = frnt*(T+(8.*T*T)+(25.*T*T*T)+(32.*T*T*T*T))
+			elif (self.dims <= 4):
+				if (self.comp == 0):
+					dRp  = -2.*(1-T)
+				elif (self.comp == 1):
+					dRp  = -T*(1.-T)*(1.-T)*(1.-T)
+				elif (self.comp == 2):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-30.
+					dRp  = frnt*(T+(5.*T*T))
+				elif (self.comp == 3):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)/-1008.
+					dRp  = frnt*(T+(7.*T*T)+(16.*T*T*T))
+				elif (self.comp == 4):		
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)*(1.-T)/-221760.
+					dRp  = frnt*((5.*T)+(45.*T*T)+(159.*T*T*T)+(231.*T*T*T*T))
+			elif (self.dims <= 6):
+				if (self.comp == 0):
+					dRp  = -3.*(1.-T)*(1.-T)	
+				elif (self.comp == 1):
+					dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+				elif (self.comp == 2):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-42.
+					dRp  = frnt*(T+(6.*T*T))
+				elif (self.comp == 3):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)/-1680.
+					dRp  = frnt*(T+(8.*T*T)+(21.*T*T*T))
+				elif (self.comp == 4):		
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)*(1.-T)*(1.-T)/-411840.
+					dRp  = frnt*((5.*T)+(50.*T*T)+(197.*T*T*T)+(320.*T*T*T*T))
+			else:
+				## Although not listed, this is ideally for 8 dim or less
+				if (self.comp == 0):
+					dRp  = -4.*(1.-T)*(1.-T)*(1.-T)
+				elif (self.comp == 1):
+					dRp  = -T*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)
+				elif (self.comp == 2):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-56.
+					dRp  = frnt*(T+(7.*T*T))
+				elif (self.comp == 3):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)*(1.-T)/-7920.
+					dRp  = frnt*((3.*T)+(27.*T*T)+(80.*T*T*T))
+				elif (self.comp == 4):
+					frnt = (1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)\
+								 *(1.-T)*(1.-T)*(1.-T)*(1.-T)*(1.-T)/-720720.
+					dRp  = frnt*((5.*T)+(55.*T*T)+(239.*T*T*T)+(429.*T*T*T*T))
 		## Now need dt/dx
 		xpi = np.subtract(PrdPts, self.tp[ploc[:,:-1],:])
 		xpm = PrdPts - self.tp[ploc[:,-1:],:]
@@ -1074,10 +1139,10 @@ class CRInterp(object):
 		## The gradient then is the summation across neighs of w*df/dt*dt/dx
 		return np.sum((dRp * dtx * self.weights[ploc[:,:-1]]), axis=1)
 
-	def __init__(self, TrnPts, TrnVals, N=5, NumLeaves=2, comp=2):
+	def __init__(self, TrnPts, TrnVals, NumLeaves=2, N=5, comp=2):
 		## TrainPts and TrainVals are the known points and their
 		# respective values which will be interpolated against.
-		## Grab the mins and normals of each dimension
+		## Grab the min and range of each dimension
 		self.tpm = np.floor(np.amin(TrnPts, axis=0))
 		self.tpr = np.ceil(np.amax(TrnPts, axis=0) - self.tpm)
 		## This prevents against colinear data (range = 0)
@@ -1087,11 +1152,21 @@ class CRInterp(object):
 		self.tv = TrnVals
 		self.dims = len(TrnPts[0,:]) + 1
 		self.ntpts = len(TrnPts[:,0])
+		## Comp is an arbitrary value that pics a function to use
 		self.comp = comp
+		## The order of each comp can be found from the dims and its value
+		order = int(np.floor((self.dims-1)/2) + (3*comp) + 1)
+		if (comp < 0):
+			## The two comps that do not follow the function above
+			if (comp == -1):
+				order = 9
+			else:
+				order = 11
 		## Uses a KD Tree to set the distances, locations, and values 
 		# of the closest neighbors to each point in the 
 		print 'Interpolation Input Values'
 		print '-Comp Equation Used:', comp
+		print '-Resulting order:', order 
 		print '-KDTree Leaves:', NumLeaves
 		print '-Number of Training Points:', self.ntpts
 		print
@@ -1152,6 +1227,314 @@ class CRInterp(object):
 				pdist[:,:,np.newaxis])/self.tpr
 
 		return grad
+
+
+## Check Inputs and Results - Open Methods =====================================
+'''
+The functions in this section are unnecessary, but can be useful even if this
+code is wrapped into another program.  Some may not be able to be run without 
+a valid problem type.
+'''
+
+
+def CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum, 
+		problem, dimensions, DistanceEffect, tension, bias, tight):
+	## The first checks the inputs for default 0s or trips that may 
+	# cause errors so that it can fix them.	
+	## Organize inputs
+	if (dimensions == 0):
+		if((problem == '2D3O') or (problem == '2D5O')):
+			dimensions = 2
+		elif((problem == 'Plane') or (problem == 'PW') or (problem == 'Crate')):
+			dimensions = 3
+		elif((problem == '5D2O') or (problem == '5D4O')):
+			dimensions = 5
+		else:
+			print 'Problem type %s does not exist.' % problem
+			raise SystemExit	
+	
+	if (neighbors == 0):
+		neighbors = max(int(trnpoints*dimensions/500), 3)
+		print 'Number of neighbors has been changed to %s' % neighbors
+		print
+	
+	if (NumLeaves == 0):
+		NumLeaves = max(int(trnpoints*dimensions/300), 2)
+		print 'Number of KD-Tree leaves has been changed to %s' % NumLeaves
+		print
+	
+	if (NumLeaves > (trnpoints/neighbors)):
+		## Can not have more leaves than training data points. Also 
+		# need to ensure there will be enough neighbors in each leaf
+		NumLeaves = trnpoints // (neighbors*1.5)
+		print 'Number of KD-Tree leaves has been changed to %s' % NumLeaves
+		print
+		if (NumLeaves > trnpoints):
+			print 'The problem has too few training points for'
+			print 'its number of dimensions.'
+			raise SystemExit
+	
+	if (len(maximum) != (dimensions-1)):
+		print "Due to being incorrectly inputted, the program is now"
+		print "adjustng the maximum and minimum settings."
+		print
+		mini = minimum[0]
+		maxi = maximum[0]
+		minimum = np.zeros((dimensions-1), dtype="int")
+		maximum = np.zeros((dimensions-1), dtype="int")
+		for D in xrange(dimensions-1):
+			minimum[D] = mini
+			maximum[D] = maxi
+
+	return problem, dimensions, neighbors, DistanceEffect, tension, \
+			bias, tight, NumLeaves, maximum, minimum
+
+def CheckResults():
+	## Plot All Results, Point Locations, and Error.  Since this will 
+	# probably vary greatly per analysis, this function was not commented
+	# a lot and was just written without much care for aesthetics or cost.
+	print
+	print '^---- Checking Results ----^'
+	print
+	
+	if (dim == 3):
+		#actul.PlotResults('Actual Data')
+		train.PlotResults('Training Data', pp)
+	
+		predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
+				pltfile='None', erplot=erplot, check=False, 
+				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+		predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
+				pltfile='None', erplot=erplot, check=False,
+				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+		predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
+				pltfile='None', erplot=erplot, check=False,
+				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+		predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
+				pltfile='None', erplot=erplot, check=False,
+				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+		predR.PlotAll('CR Predicted Data', trainCRInt, 'CR',
+				pltfile='None', erplot=erplot, check=False,
+				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+	#	predRbf.PlotResults('RBF Predicted Data', pltfile='None')
+	#	predRbf.FindError('RBF Predicted Data', pltfile='None', plot=True, 
+	#				  check=False, step=0.00000001)
+	elif (dim == 2):
+		fig = plt.figure()
+	
+		Ax = actul.points[:,0].flatten()
+		Ay = actul.values[:,0].flatten()
+		Tx = train.points[:,0].flatten()
+		Ty = train.values[:,0].flatten()
+		Lx = predL.points[:,0].flatten()
+		Ly = predL.values[:,0].flatten()
+		Wx = predW.points[:,0].flatten()
+		Wy = predW.values[:,0].flatten()
+		Cx = predC.points[:,0].flatten().real
+		Cy = predC.values[:,0].flatten().real
+		Hx = predH.points[:,0].flatten().real
+		Hy = predH.values[:,0].flatten().real
+		Rx = predR.points[:,0].flatten().real
+		Ry = predR.values[:,0].flatten().real
+		xmi = np.min(Ax)
+		xma = np.max(Ax)
+		ymi = np.min(Ay)
+		yma = np.max(Ay)
+		plt.plot(Ax, Ay, 'k-', Tx, Ty, 'bo', Lx, Ly, 'y-',Wx, Wy, 'c-',Cx, Cy, 'g--',Hx, Hy, 'r--',Rx, Ry, 'm--')
+		fig.suptitle('%s Predicted Data Results' % problem,
+						fontsize=14, fontweight='bold')
+		plt.xlabel('Independent Variable')
+		plt.ylabel('Dependent Variable')
+		plt.xlim(xmi, xma)
+		plt.ylim(ymi, yma)
+		plt.legend(['Actual', 'Training', 'Linear', 'Weighted', 'Cosine', 'Hermite', 'CRBF'], loc=4, prop={'size':10})
+	
+		if (allplot == True):
+			fig = plt.figure()
+			title = 'Linear'
+			
+			Px = predL.points[:,0].flatten()
+			Py = predL.values[:,0].flatten()
+			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+			fig.suptitle('%s Data Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(xmi, xma)
+			plt.ylim(ymi, yma)
+			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+			
+			fig = plt.figure()
+			title = 'Weighted'
+			
+			Px = predW.points[:,0].flatten()
+			Py = predW.values[:,0].flatten()
+			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+			fig.suptitle('%s Data Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(xmi, xma)
+			plt.ylim(ymi, yma)
+			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+		
+			fig = plt.figure()
+			title = 'Cosine'
+			
+			Px = predC.points[:,0].flatten().real
+			Py = predC.values[:,0].flatten().real
+			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+			fig.suptitle('%s Data Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(xmi, xma)
+			plt.ylim(ymi, yma)
+			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+			
+			fig = plt.figure()
+			title = 'Hermite'
+			
+			Px = predH.points[:,0].flatten().real
+			Py = predH.values[:,0].flatten().real
+			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+			fig.suptitle('%s Data Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(xmi, xma)
+			plt.ylim(ymi, yma)
+			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+		
+			fig = plt.figure()
+			title = 'CRBF'
+			
+			Px = predR.points[:,0].flatten().real
+			Py = predR.values[:,0].flatten().real
+			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+			fig.suptitle('%s Data Results' % title, 
+							fontsize=14, fontweight='bold')
+			plt.xlabel('Independent Variable')
+			plt.ylabel('Dependent Variable')
+			plt.xlim(xmi, xma)
+			plt.ylim(ymi, yma)
+			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+			
+		predL.FindError('LN Predicted Data', 'None', erplot, False)
+		predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		
+		predW.FindError('WN Predicted Data', 'None', erplot, False)
+		predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	
+		predC.FindError('CN Predicted Data', 'None', erplot, False)
+		predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	
+		predH.FindError('HN Predicted Data', 'None', erplot, False)
+		predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		
+		predR.FindError('CR Predicted Data', 'None', erplot, False)
+		predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	else:
+		
+		predL.FindError('LN Predicted Data', 'None', erplot, False)
+		predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		predW.FindError('WN Predicted Data', 'None', erplot, False)
+		predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		predC.FindError('CN Predicted Data', 'None', erplot, False)
+		predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		predH.FindError('HN Predicted Data', 'None', erplot, False)
+		predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		predR.FindError('CR Predicted Data', 'None', erplot, False)
+		predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+						pltfile='None',plot=erplot,check=False,
+						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+	
+	print '<< Run Times >>'
+	print
+	print '-LN Interpolator Setup:', (p1-p0)
+	print '-LN Interpolator Value Query:', (tp5-t0)
+	print '-LN Interpolator Gradient Query:', (t1-tp5)
+	print
+	print '-WN Interpolator Setup:', (p2-p1)
+	print '-WN Interpolator Value Query:', (t1p5-t1)
+	print '-WN Interpolator Gradient Query:', (t2-t1p5)
+	print
+	print '-CN Interpolator Setup:', (p3-p2)
+	print '-CN Interpolator Value Query:', (t2p5-t2)
+	print '-CN Interpolator Gradient Query:', (t3-t2p5)
+	print
+	print '-HN Interpolator Setup:', (p4-p3)
+	print '-HN Interpolator Value Query:', (t3p5-t3)
+	print '-HN Interpolator Gradient Query:', (t4-t3p5)
+	print
+	print '-CR Interpolator Setup:', (p5-p4)
+	print '-CR Interpolator Value Query:', (t4p5-t4)
+	print '-CR Interpolator Gradient Query:', (t5-t4p5)
+	print
+	#print '-RBF Interpolator Setup:', (prbf-p5)
+	#print '-RBF Interpolator Value Query:', (trbf-t5)
+	#print
+	
+	'''
+	with open("RunError.txt", "a") as efile:
+		efile.write(predL.funct+ "\n")       
+		efile.write("Run"+ "\n")
+		efile.write(              "LN"+ "\n")
+		efile.write(str(np.average(predL.error))  + "\n") 
+		efile.write(str(    np.max(predL.error))  + "\n")
+		efile.write(str(np.average(predL.gaerror))+ "\n")
+		efile.write(str(    np.max(predL.gaerror))+ "\n")
+		efile.write(str(np.average(predL.gcerror))+ "\n")
+		efile.write(str(    np.max(predL.gcerror))+ "\n")
+		efile.write(              "WN"+ "\n")
+		efile.write(str(np.average(predW.error))  + "\n") 
+		efile.write(str(    np.max(predW.error))  + "\n")
+		efile.write(str(np.average(predW.gaerror))+ "\n") 
+		efile.write(str(    np.max(predW.gaerror))+ "\n") 
+		efile.write(str(np.average(predW.gcerror))+ "\n") 
+		efile.write(str(    np.max(predW.gcerror))+ "\n") 
+		efile.write(              "CN"+ "\n")
+		efile.write(str(np.average(predC.error))  + "\n") 
+		efile.write(str(    np.max(predC.error))  + "\n")
+		efile.write(str(np.average(predC.gaerror))+ "\n") 
+		efile.write(str(    np.max(predC.gaerror))+ "\n") 
+		efile.write(str(np.average(predC.gcerror))+ "\n") 
+		efile.write(str(    np.max(predC.gcerror))+ "\n") 
+		efile.write(              "HN"+ "\n")
+		efile.write(str(np.average(predH.error))  + "\n") 
+		efile.write(str(    np.max(predH.error))  + "\n")
+		efile.write(str(np.average(predH.gaerror))+ "\n") 
+		efile.write(str(    np.max(predH.gaerror))+ "\n") 
+		efile.write(str(np.average(predH.gcerror))+ "\n") 
+		efile.write(str(    np.max(predH.gcerror))+ "\n") 
+		efile.write(              "RN"+ "\n")
+		efile.write(str(np.average(predR.error))  + "\n") 
+		efile.write(str(    np.max(predR.error))  + "\n")
+		efile.write(str(np.average(predR.gaerror))+ "\n")
+		efile.write(str(    np.max(predR.gaerror))+ "\n")
+		efile.write(str(np.average(predR.gcerror))+ "\n")
+		efile.write(str(    np.max(predR.gcerror))+ "\n")
+		efile.write("\n")
+	'''
+	#pp.close()
 
 
 ## More Information (As Promised) ==============================================
@@ -1244,6 +1627,16 @@ clss CRInterp(object):
 	df gradient(self, PredPoints):
 		rtrn grad
 
+## Check Inputs and Results - Open Methods =====================================
+
+df CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum, 
+		problem, DistanceEffect, tension, bias, tight):
+	rtrn problem, dimensions, neighbors, DistanceEffect, tension, \
+			bias, tight, NumLeaves, maximum, minimum
+
+df CheckResults():
+
+
 Note - some vowels removed to ensure vim friendliness.
 '''
 ## Running Code ================================================================
@@ -1258,11 +1651,12 @@ pp = 'None'
 step = 0.00000001 # Complex step step size
 
 ## Problem Inputs and put into simpler variables
+dimensions = 0 # If 0, the dimensions is chosen from the problem type
 minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
 trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = 'Crate' # Problem type, options seen in organize inputs loop below
+problem = 'PW' # Problem type, options seen in organize inputs loop below
 
 trnpoints = 10000  # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000  # Number of prediction points
@@ -1271,62 +1665,17 @@ neighbors = 20 # KD-Tree neighbors found, default ~ 1/1000 trnpoints, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
-comp = 34 # Type of CRBF used in the CR interpolation
+comp = -2 # Type of CRBF used in the CR interpolation, default -2
 NumLeaves = 100 # Leaves of KD Tree, default of about 1 per 500 training points
 tight = False # Default algorithm had only true, change if bad results with
 # neighs << trnpoints or a high dimension (>3)
 
-if (neighbors == 0):
-	neighbors = int(trnpoints/500)
-	print 'Number of neighbors has been changed to %s' % neighbors
-	print
-
-if (NumLeaves == 0):
-	NumLeaves = int(trnpoints/100)
-	print 'Number of KD-Tree leaves has been changed to %s' % NumLeaves
-	print
-
-if (NumLeaves > (trnpoints/neighbors)):
-			## Can not have more leaves than training data points. Also 
-			# need to ensure there will be enough neighbors in each leaf
-			NumLeaves = trnpoints // (neighbors*1.5)
-			print 'Number of KD-Tree leaves has been changed to %s' % NumLeaves
-			print
-			if (NumLeaves > trnpoints):
-				print 'The problem has too few training points for'
-				print 'its number of dimensions.'
-				raise SystemExit
-
-## Organize inputs
-if ((problem == '2D3O') or (problem == '2D5O')):
-	dimensions = 2
-elif ((problem == 'Plane') or (problem == 'PW') or (problem == 'Crate')):
-	dimensions = 3
-elif ((problem == '5D2O') or (problem == '5D4O')):
-	dimensions = 5
-else:
-	print 'Problem type %s does not exist.' % problem
-	raise SystemExit
-
-if (len(maximum) != (dimensions-1)):
-	print "Due to being incorrectly inputted, the program is now"
-	print "adjustng the maximum and minimum settings."
-	mini = minimum[0]
-	maxi = maximum[0]
-	minimum = np.zeros((dimensions-1), dtype="int")
-	maximum = np.zeros((dimensions-1), dtype="int")
-	for D in xrange(dimensions-1):
-		minimum[D] = mini
-		maximum[D] = maxi
-
-## Shorten inputs for ease of typing
-pr = problem
-dim = dimensions
-N = neighbors
-DE = DistanceEffect
-t = tension
-b = bias
-tt = tight
+## Check and shorten inputs for ease of typing:
+# pr=problem, dim=dimensions, N=neighbors, DE=DistanceEffect, 
+# t=tension, b=bias, tt=tight, NL=NumLeaves, maxi=maximum, mini=minimum
+pr, dim, N, DE, t, b, tt, NL, maxi, mini = \
+		CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum, 
+				problem, dimensions, DistanceEffect, tension, bias, tight)
 
 ## Extra Inputs
 allplot = False #For 2D, plot separate graphs for each interp
@@ -1334,13 +1683,14 @@ erplot = False #Choose to plot error
 AbyT = 1 # Multilpier for actual to training data points
 
 ## Create the Independent Data
-train = N_Data(minimum, maximum, trnpoints, pr, trndist, dim)
-actul = N_Data(minimum, maximum, (trnpoints*AbyT), pr, trndist, dim)
-predL = N_Data(minimum, maximum, prdpoints, pr, prddist, dim)
+train = N_Data(mini, maxi, trnpoints, pr, trndist, dim)
+actul = N_Data(mini, maxi, (trnpoints*AbyT), pr, trndist, dim)
+predL = N_Data(mini, maxi, prdpoints, pr, prddist, dim)
 predW = cp.deepcopy(predL)
 predC = cp.deepcopy(predL)
 predH = cp.deepcopy(predL)
 predR = cp.deepcopy(predL)
+#predRbf = cp.deepcopy(predL)
 
 ## Set Dependents for Training Data and Plot
 train.CreateDep()
@@ -1348,16 +1698,18 @@ actul.CreateDep()
 
 ## Setup Interpolation Methods around Training Points
 p0 = time.time()
-trainLNInt = LNInterp(train.points, train.values, NumLeaves)
+trainLNInt = LNInterp(train.points, train.values, NL)
 p1 = time.time()
-trainWNInt = WNInterp(train.points, train.values, NumLeaves)
+trainWNInt = WNInterp(train.points, train.values, NL)
 p2 = time.time()
-trainCNInt = CNInterp(train.points, train.values, NumLeaves)
+trainCNInt = CNInterp(train.points, train.values, NL)
 p3 = time.time()
-trainHNInt = HNInterp(train.points, train.values, NumLeaves)
+trainHNInt = HNInterp(train.points, train.values, NL)
 p4 = time.time()
-trainCRInt = CRInterp(train.points, train.values, N, NumLeaves, comp)
+trainCRInt = CRInterp(train.points, train.values, NL, N, comp)
 p5 = time.time()
+#rbfi = interp.Rbf(train.points[:,0], train.points[:,1], train.values[:,0], function='multiquadric')
+#prbf = time.time()
 
 print
 print '^---- Running Interpolation Code ----^'
@@ -1385,6 +1737,8 @@ prdzR = trainCRInt(predR.points)
 t4p5 = time.time()
 prdgR = trainCRInt.gradient(predR.points)
 t5 = time.time()
+#prdzrbf = rbfi(predRbf.points[:,0], predRbf.points[:,1])
+#trbf = time.time()
 
 ## Assign all Dependents to Check Plots and Error
 predL.AssignDep(prdzL, prdgL)
@@ -1392,273 +1746,15 @@ predW.AssignDep(prdzW, prdgW)
 predC.AssignDep(prdzC, prdgC)
 predH.AssignDep(prdzH, prdgH)
 predR.AssignDep(prdzR, prdgR)
+#predRbf.AssignDep(prdzrbf, [0])
 
-## Plot All Results, Point Locations, and Error
+CheckResults()
 
-print
-print '^---- Checking Results ----^'
-print
-
-if (dimensions == 3):
-	#actul.PlotResults('Actual Data')
-	train.PlotResults('Training Data', pp)
-
-	predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
-			pltfile='None', erplot=erplot, check=False, 
-			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-	predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
-			pltfile='None', erplot=erplot, check=False,
-			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-	predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
-			pltfile='None', erplot=erplot, check=False,
-			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-	predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
-			pltfile='None', erplot=erplot, check=False,
-			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-	predR.PlotAll('CR Predicted Data', trainCRInt, 'CR',
-			pltfile='None', erplot=erplot, check=False,
-			step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-
-elif (dimensions == 2):
-	fig = plt.figure()
-
-	Ax = actul.points[:,0].flatten()
-	Ay = actul.values[:,0].flatten()
-	Tx = train.points[:,0].flatten()
-	Ty = train.values[:,0].flatten()
-	Lx = predL.points[:,0].flatten()
-	Ly = predL.values[:,0].flatten()
-	Wx = predW.points[:,0].flatten()
-	Wy = predW.values[:,0].flatten()
-	Cx = predC.points[:,0].flatten().real
-	Cy = predC.values[:,0].flatten().real
-	Hx = predH.points[:,0].flatten().real
-	Hy = predH.values[:,0].flatten().real
-	Rx = predR.points[:,0].flatten().real
-	Ry = predR.values[:,0].flatten().real
-	xmi = np.min(Ax)
-	xma = np.max(Ax)
-	ymi = np.min(Ay)
-	yma = np.max(Ay)
-	plt.plot(Ax, Ay, 'k-', Tx, Ty, 'bo', Lx, Ly, 'y-',Wx, Wy, 'c-',Cx, Cy, 'g--',Hx, Hy, 'r--',Rx, Ry, 'm--')
-	fig.suptitle('%s Predicted Data Results' % problem,
-					fontsize=14, fontweight='bold')
-	plt.xlabel('Independent Variable')
-	plt.ylabel('Dependent Variable')
-	plt.xlim(xmi, xma)
-	plt.ylim(ymi, yma)
-	plt.legend(['Actual', 'Training', 'Linear', 'Weighted', 'Cosine', 'Hermite', 'CRBF'], loc=4, prop={'size':10})
-
-	if (allplot == True):
-		fig = plt.figure()
-		title = 'Linear'
-		
-		Px = predL.points[:,0].flatten()
-		Py = predL.values[:,0].flatten()
-		plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-		fig.suptitle('%s Data Results' % title, 
-						fontsize=14, fontweight='bold')
-		plt.xlabel('Independent Variable')
-		plt.ylabel('Dependent Variable')
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-		plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-		
-		fig = plt.figure()
-		title = 'Weighted'
-		
-		Px = predW.points[:,0].flatten()
-		Py = predW.values[:,0].flatten()
-		plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-		fig.suptitle('%s Data Results' % title, 
-						fontsize=14, fontweight='bold')
-		plt.xlabel('Independent Variable')
-		plt.ylabel('Dependent Variable')
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-		plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-	
-		fig = plt.figure()
-		title = 'Cosine'
-		
-		Px = predC.points[:,0].flatten().real
-		Py = predC.values[:,0].flatten().real
-		plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-		fig.suptitle('%s Data Results' % title, 
-						fontsize=14, fontweight='bold')
-		plt.xlabel('Independent Variable')
-		plt.ylabel('Dependent Variable')
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-		plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-		
-		fig = plt.figure()
-		title = 'Hermite'
-		
-		Px = predH.points[:,0].flatten().real
-		Py = predH.values[:,0].flatten().real
-		plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-		fig.suptitle('%s Data Results' % title, 
-						fontsize=14, fontweight='bold')
-		plt.xlabel('Independent Variable')
-		plt.ylabel('Dependent Variable')
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-		plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-	
-		fig = plt.figure()
-		title = 'CRBF'
-		
-		Px = predR.points[:,0].flatten().real
-		Py = predR.values[:,0].flatten().real
-		plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-		fig.suptitle('%s Data Results' % title, 
-						fontsize=14, fontweight='bold')
-		plt.xlabel('Independent Variable')
-		plt.ylabel('Dependent Variable')
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-		plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-		
-	predL.FindError('LN Predicted Data', 'None', erplot, False)
-	predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	
-	predW.FindError('WN Predicted Data', 'None', erplot, False)
-	predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-
-	predC.FindError('CN Predicted Data', 'None', erplot, False)
-	predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-
-	predH.FindError('HN Predicted Data', 'None', erplot, False)
-	predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	
-	predR.FindError('CR Predicted Data', 'None', erplot, False)
-	predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-else:
-	
-	predL.FindError('LN Predicted Data', 'None', erplot, False)
-	predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	predW.FindError('WN Predicted Data', 'None', erplot, False)
-	predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	predC.FindError('CN Predicted Data', 'None', erplot, False)
-	predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	predH.FindError('HN Predicted Data', 'None', erplot, False)
-	predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	predR.FindError('CR Predicted Data', 'None', erplot, False)
-	predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
-					pltfile='None',plot=erplot,check=False,
-					step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-
-print '<< Run Times >>'
-print
-print '-LN Interpolator Setup:', (p1-p0)
-print '-LN Interpolator Value Query:', (tp5-t0)
-print '-LN Interpolator Gradient Query:', (t1-tp5)
-print
-print '-WN Interpolator Setup:', (p2-p1)
-print '-WN Interpolator Value Query:', (t1p5-t1)
-print '-WN Interpolator Gradient Query:', (t2-t1p5)
-print
-print '-CN Interpolator Setup:', (p3-p2)
-print '-CN Interpolator Value Query:', (t2p5-t2)
-print '-CN Interpolator Gradient Query:', (t3-t2p5)
-print
-print '-HN Interpolator Setup:', (p4-p3)
-print '-HN Interpolator Value Query:', (t3p5-t3)
-print '-HN Interpolator Gradient Query:', (t4-t3p5)
-print
-print '-CR Interpolator Setup:', (p5-p4)
-print '-CR Interpolator Value Query:', (t4p5-t4)
-print '-CR Interpolator Gradient Query:', (t5-t4p5)
-print
-
-'''
-with open("RunError.txt", "a") as efile:
-	efile.write(predL.funct+ "\n")       
-	efile.write("Run"+ "\n")
-	efile.write(              "LN"+ "\n")
-	efile.write(str(np.average(predL.error))  + "\n") 
-	efile.write(str(    np.max(predL.error))  + "\n")
-	efile.write(str(np.average(predL.gaerror))+ "\n")
-	efile.write(str(    np.max(predL.gaerror))+ "\n")
-	efile.write(str(np.average(predL.gcerror))+ "\n")
-	efile.write(str(    np.max(predL.gcerror))+ "\n")
-	efile.write(              "WN"+ "\n")
-	efile.write(str(np.average(predW.error))  + "\n") 
-	efile.write(str(    np.max(predW.error))  + "\n")
-	efile.write(str(np.average(predW.gaerror))+ "\n") 
-	efile.write(str(    np.max(predW.gaerror))+ "\n") 
-	efile.write(str(np.average(predW.gcerror))+ "\n") 
-	efile.write(str(    np.max(predW.gcerror))+ "\n") 
-	efile.write(              "CN"+ "\n")
-	efile.write(str(np.average(predC.error))  + "\n") 
-	efile.write(str(    np.max(predC.error))  + "\n")
-	efile.write(str(np.average(predC.gaerror))+ "\n") 
-	efile.write(str(    np.max(predC.gaerror))+ "\n") 
-	efile.write(str(np.average(predC.gcerror))+ "\n") 
-	efile.write(str(    np.max(predC.gcerror))+ "\n") 
-	efile.write(              "HN"+ "\n")
-	efile.write(str(np.average(predH.error))  + "\n") 
-	efile.write(str(    np.max(predH.error))  + "\n")
-	efile.write(str(np.average(predH.gaerror))+ "\n") 
-	efile.write(str(    np.max(predH.gaerror))+ "\n") 
-	efile.write(str(np.average(predH.gcerror))+ "\n") 
-	efile.write(str(    np.max(predH.gcerror))+ "\n") 
-	efile.write(              "RN"+ "\n")
-	efile.write(str(np.average(predR.error))  + "\n") 
-	efile.write(str(    np.max(predR.error))  + "\n")
-	efile.write(str(np.average(predR.gaerror))+ "\n")
-	efile.write(str(    np.max(predR.gaerror))+ "\n")
-	efile.write(str(np.average(predR.gcerror))+ "\n")
-	efile.write(str(    np.max(predR.gcerror))+ "\n")
-	efile.write("\n")
-'''
-#pp.close()                             
 plt.show()                              
-                                    
-## Written Out =================================================================
-                                        
-'''                                     
-count = 0
-## If compact domain radius is not set, use an average 
-# distance but ignore any colinear points in it.
 
-for d in xrange(self.dims-1):
-	rad += ((np.max(self.tp[:,d]) - np.min(self.tp[:,d]))*N)\
-			/numtrn
-rad = rad/(self.dims-1)
- Heavy rad determination
-for i in xrange(nppts):
-	print 'At %s out of %s' % (i, nppts)
-	for j in xrange(numtrn):
-		dc[i,j] = spatial.distance.euclidean(self.tp[i,:], \
-										self.tp[j,:])
-		if (dc[i,j] > 0.000000000001):
-				## Want to ignore 0s - colinear points
-				rad += dc[i,j]
-				count +=1
-rad = rad/count
 '''
-
-## Side note: PrdPts are predicted points technically, although it's not really 
-# that simple. They are better named pride points.  Everyone needs pride points,
-# but their value is unknown usually and can only be determined when related to
-# those around you. Usually taken from Corey Watt.
+Side note: PrdPts are predicted points technically, although it's not really 
+that simple. They are better named pride points.  Everyone needs pride points,
+but their value is unknown usually and can only be determined when related to
+those around you. Usually taken from Corey Watt.
+'''
