@@ -540,7 +540,7 @@ class NNInterpBase(object):
 
 		## Make training data into a Tree
 		leavesz = math.ceil(self.ntpts/(NumLeaves+0.00000000000001))
-		KData = spatial.KDTree(self.tp,leafsize=leavesz)
+		KData = spatial.cKDTree(self.tp,leafsize=leavesz)
 		self.KData = KData
 
 class LNInterp(NNInterpBase):
@@ -597,7 +597,7 @@ class LNInterp(NNInterpBase):
 		## Find them neigbors.  Linear only uses #neighs=#dims
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
-		ndist, nloc = self.KData.query(PrdPts ,self.dims)
+		ndist, nloc = self.KData.query(PrdPts.real ,self.dims)
 		'''
 		print 'Linear Plane Nearest Neighbors (LN) KDTree Results'
 		print '-Number of Predicted Points:', nppts
@@ -635,7 +635,7 @@ class LNInterp(NNInterpBase):
 		## Linear interp only uses as many neighbors as it has dimensions
 		dims = self.dims
 		## Find them neigbors
-		ndist, nloc = self.KData.query(PrdPts ,self.dims)
+		ndist, nloc = self.KData.query(PrdPts.real ,self.dims)
 		## Need to ensure there are enough dimensions to find the normal with
 		if (self.dims > 2):
 			normal, prdtemp, pc = self.main(PrdPts, nppts, self.dims, nloc)
@@ -657,7 +657,7 @@ class WNInterp(NNInterpBase):
 		## Find them neigbors
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 		'''
 		print 'Weighted Nearest Neighbors (WN) KDTree Results'
 		print '-Number of Predicted Points:', nppts
@@ -690,7 +690,7 @@ class WNInterp(NNInterpBase):
 		PrdPts = (PredPoints - self.tpm) / self.tpr
 		nppts    = len(PrdPts[:,0])
 		## Find them neigbors
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 		## Setup problem
 		vals = 0.0
 		pdims = self.dims - 1
@@ -750,7 +750,7 @@ class CNInterp(NNInterpBase):
 		## Find them neigbors
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 		
 		'''
 		print 'Cosine Nearest Neighbors (CN) KDTree Results'
@@ -781,7 +781,7 @@ class CNInterp(NNInterpBase):
 		nppts    = len(PrdPts[:,0])
 		gradient = np.zeros((nppts, self.dims-1), dtype="float")
 		## Find them neigbors
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 		## This sorts the rows by the values in the column specified. 
 		## The neighvals dim is [neigh#, dimension] 
 		neighvals = np.concatenate((self.tp[nloc,:] ,
@@ -891,7 +891,7 @@ class HNInterp(NNInterpBase):
 		## Find them neigbors
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 
 		'''
 		print 'Hermite Nearest Neighbors (HN) KDTree Results'
@@ -934,7 +934,7 @@ class HNInterp(NNInterpBase):
 			## Hermite requires at least 5 neighbors
 			N = 5
 		## Find them neigbors
-		ndist, nloc = self.KData.query(PrdPts ,N)
+		ndist, nloc = self.KData.query(PrdPts.real ,N)
 		## This sorts the rows by the values in the column specified. 
 		## The neighvals dim is [neigh#, dimension] 
 		neighvals = np.concatenate((self.tp[nloc,:] ,
@@ -1048,14 +1048,7 @@ class CRInterp(object):
 
 		for i in xrange(npp):
 			R[i,loc[i,:-1]] = Cf[i,:] * Cb[i,:]
-
-		'''
-		for i in xrange(npp):
-			c = 0
-			for j in loc[i,:-1]:	
-				R[i,j] = Cf[i,c] * Cb[i,c]
-				c += 1
-		'''
+		
 		return R
 	
 	def FinddR(self, PrdPts, ploc, pdist):
@@ -1078,7 +1071,6 @@ class CRInterp(object):
 								(25.*T*T*T*T)))
 		elif (self.comp == -3):
 			dRp = T/np.sqrt((T*T)*1.)
-
 		else:
 			## Start dim dependent comps, review first occurance for more info
 			if (self.dims <= 2):
@@ -1151,13 +1143,8 @@ class CRInterp(object):
 		## TrainPts and TrainVals are the known points and their
 		# respective values which will be interpolated against.
 		## Grab the min and range of each dimension
-		t1 = time.time()
 		self.tpm = np.floor(np.amin(TrnPts, axis=0))
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		self.tpr = np.ceil(np.amax(TrnPts, axis=0) - self.tpm)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## This prevents against colinear data (range = 0)
 		self.tpr[self.tpr == 0] = 1
 		## Normalize all points
@@ -1165,24 +1152,16 @@ class CRInterp(object):
 		self.tv = TrnVals
 		self.dims = len(TrnPts[0,:]) + 1
 		self.ntpts = len(TrnPts[:,0])
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Comp is an arbitrary value that pics a function to use
 		self.comp = comp
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## The order of each comp can be found from the dims and its value
 		order = int(np.floor((self.dims-1)/2) + (3*comp) + 1)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		if (comp < 0):
 			## The two comps that do not follow the function above
 			if (comp == -1):
 				order = 9
 			else:
 				order = 11
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Uses a KD Tree to set the distances, locations, and values 
 		# of the closest neighbors to each point in the 
 		'''
@@ -1195,46 +1174,25 @@ class CRInterp(object):
 		'''
 		## Make into training data into a Tree
 		leavesz = math.ceil(self.ntpts/NumLeaves)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Start by creating a KDTree around the training points
 		KData = spatial.cKDTree(self.tp,leafsize=leavesz)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## For weights, first find the training points radial neighbors
 		tdist, tloc = KData.query(self.tp, N, 0.0, 2)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		Tt  = tdist[:,:-1]/tdist[:,-1:]
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Next determine weight matrix
 		Rt = self.FindR(self.ntpts, Tt, tloc) 
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		weights = (spsl.spsolve(csc_matrix(Rt), self.tv))[:,np.newaxis]
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## KData query takes (data, #ofneighbors) to determine closest 
 		# training points to predicted data
 		self.N = N
 		self.KData = KData
 		self.weights = weights
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
-		print 'End init'
-		print
 
 	def __call__(self, PredPoints):
-		t1 = time.time()
 		PrdPts = (PredPoints - self.tpm) / self.tpr
 		nppts = len(PrdPts[:,0])
 		## Setup prediction points and find their radial neighbors 
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		pdist, ploc = self.KData.query(PrdPts.real, self.N)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Check if complex step is being run
 		if (np.any(PrdPts[0,:].imag) > 0):
 			dimdiff = np.subtract(PrdPts.reshape(nppts,1,(self.dims-1)), 
@@ -1242,8 +1200,6 @@ class CRInterp(object):
 			## KD Tree ignores imaginary part, muse redo ndist if complex 
 			pdist = np.sqrt(np.sum((dimdiff*dimdiff), axis=2))
 		
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		## Take farthest distance of each point
 		Tp  = pdist[:,:-1]/pdist[:,-1:]
 		'''
@@ -1255,13 +1211,7 @@ class CRInterp(object):
 		print
 		'''
 		Rp = self.FindR(nppts, Tp, ploc)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
 		predz = np.dot(Rp, self.weights).reshape(nppts)
-		print 'Time:', (time.time()-t1)
-		t1 = time.time()
-		print 'End call'
-		print
 		return predz
 
 	def gradient(self, PredPoints):
@@ -1277,7 +1227,7 @@ class CRInterp(object):
 		return grad
 
 
-## Check Inputs and Results - Open Methods =====================================
+## Check and Run - Open Methods ================================================
 '''
 The functions in this section are unnecessary, but can be useful even if this
 code is wrapped into another program.  Some may not be able to be run without 
@@ -1302,7 +1252,7 @@ def CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum,
 			raise SystemExit	
 	
 	if (neighbors == 0):
-		neighbors = max(int(trnpoints*dimensions/1500), 5)
+		neighbors = max(int(trnpoints*dimensions/1500), min(10, trnpoints))
 		print 'Number of neighbors has been changed to %s' % neighbors
 		print
 	
@@ -1343,269 +1293,349 @@ def CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum,
 	return problem, dimensions, neighbors, DistanceEffect, tension, \
 			bias, tight, NumLeaves, maximum, minimum
 
-def CheckResults():
-	## Plot All Results, Point Locations, and Error.  Since this will 
-	# probably vary greatly per analysis, this function was not commented
-	# a lot and was just written without much care for aesthetics or cost.
+def RunTestCode():
+	print 
+	print '^---- N Dimensional Interpolation ----^'
+	print 
+	
+	## Check and shorten inputs for ease of typing:
+	# pr=problem, dim=dimensions, N=neighbors, DE=DistanceEffect, 
+	# t=tension, b=bias, tt=tight, NL=NumLeaves, maxi=maximum, mini=minimum
+	pr, dim, N, DE, t, b, tt, NL, maxi, mini = \
+			CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum, 
+					problem, dimensions, DistanceEffect, tension, bias)
+	## Can override tt here
+	
+	## Create the Independent Data
+	train = N_Data(mini, maxi, trnpoints, pr, trndist, dim)
+	actul = N_Data(mini, maxi, (trnpoints*AbyT), pr, trndist, dim)
+	predL = N_Data(mini, maxi, prdpoints, pr, prddist, dim)
+	predW = cp.deepcopy(predL)
+	predC = cp.deepcopy(predL)
+	predH = cp.deepcopy(predL)
+	predR = cp.deepcopy(predL)
+	#predRbf = cp.deepcopy(predL)
+	
+	## Set Dependents for Training Data and Plot
+	train.CreateDep()
+	actul.CreateDep()
+	
+	# Setup Interpolation Methods around Training Points
+	p0 = time.time()
+	trainLNInt = LNInterp(train.points, train.values, NL)
+	p1 = time.time()
+	trainWNInt = WNInterp(train.points, train.values, NL)
+	p2 = time.time()
+	trainCNInt = CNInterp(train.points, train.values, NL)
+	p3 = time.time()
+	trainHNInt = HNInterp(train.points, train.values, NL)
+	p4 = time.time()
+	trainCRInt = CRInterp(train.points, train.values, NL, N, comp)
+	p5 = time.time()
+	#rbfi = interp.Rbf(train.points[:,0], train.points[:,1], train.values[:,0], function='multiquadric')
+	#prbf = time.time()
+	
 	print
-	print '^---- Checking Results ----^'
+	print '^---- Running Interpolation Code ----^'
 	print
 	
-	if (dim == 3):
-		actul.PlotResults('Actual Data')
-		train.PlotResults('Training Data', pp)
+	# Perform Interpolation on Predicted Points
+	t0 = time.time()
+	prdzL = trainLNInt(predL.points)
+	tp5 = time.time()
+	prdgL = trainLNInt.gradient(predL.points)
+	t1 = time.time()
+	prdzW = trainWNInt(predW.points, N, DE)
+	t1p5 = time.time()
+	prdgW = trainWNInt.gradient(predW.points, N, DE)
+	t2 = time.time()
+	prdzC = trainCNInt(predC.points, N)
+	t2p5 = time.time()
+	prdgC = trainCNInt.gradient(predC.points, N)
+	t3 = time.time()
+	prdzH = trainHNInt(predH.points, N, t, b, tt)
+	t3p5 = time.time()
+	prdgH = trainHNInt.gradient(predH.points, N, t, b, tt)
+	t4 = time.time()
+	prdzR = trainCRInt(predR.points)
+	t4p5 = time.time()
+	prdgR = trainCRInt.gradient(predR.points)
+	t5 = time.time()
+	#prdzrbf = rbfi(predRbf.points[:,0],predRbf.points[:,1])
+	#trbf = time.time()
 	
-		predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
-				pltfile='None', erplot=erplot, check=False, ptplot = False,
-				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-		predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
-				pltfile='None', erplot=erplot, check=False, ptplot = False,
-				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-		predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
-				pltfile='None', erplot=erplot, check=False, ptplot = False,
-				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-		predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
-				pltfile='None', erplot=erplot, check=False, ptplot = False,
-				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-		predR.PlotAll('CR Predicted Data', trainCRInt, 'CR',
-				pltfile='None', erplot=erplot, check=False, ptplot = False,
-				step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
-	#	predRbf.PlotResults('RBF Predicted Data', pltfile='None')
-	#	predRbf.FindError('RBF Predicted Data', pltfile='None', plot=True, 
-	#				  check=False, step=0.00000001)
-	elif (dim == 2):
-		fig = plt.figure()
-		ax = plt.subplot(111)	
-		Ax = actul.points[:,0].flatten()
-		Ay = actul.values[:,0].flatten()
-		Tx = train.points[:,0].flatten()
-		Ty = train.values[:,0].flatten()
-		Lx = predL.points[:,0].flatten()
-		Ly = predL.values[:,0].flatten()
-		Wx = predW.points[:,0].flatten()
-		Wy = predW.values[:,0].flatten()
-		Cx = predC.points[:,0].flatten().real
-		Cy = predC.values[:,0].flatten().real
-		Hx = predH.points[:,0].flatten().real
-		Hy = predH.values[:,0].flatten().real
-		Rx = predR.points[:,0].flatten().real
-		Ry = predR.values[:,0].flatten().real
-		xmi = np.min(Ax)
-		xma = np.max(Ax)
-		ymi = np.min(Ay)
-		yma = np.max(Ay)
-		ax.plot(Tx, Ty, 'bo' , label='Training')
-		ax.plot(Ax, Ay, 'k-' , label='Actual')
-		ax.plot(Lx, Ly, 'y-' , label='Linear')
-		ax.plot(Wx, Wy, 'c-' , label='Weighted')
-		ax.plot(Cx, Cy, 'g--', label='Cosine')
-		ax.plot(Hx, Hy, 'r--', label='Hermite')
-		ax.plot(Rx, Ry, 'm--', label='CS-RBF')
-		box = ax.get_position()
-		ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-		ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-		ax.set_title('%s Predicted Data Results' % problem,
-						fontsize=16, fontweight='bold')
-		ax.set_xlabel('Independent Variable', fontsize=14)
-		ax.set_ylabel('Dependent Variable', fontsize=14)
-		plt.tick_params(labelsize=14)
-		plt.xlim(xmi, xma)
-		plt.ylim(ymi, yma)
-	
-		if (allplot == True):
+	## Assign all Dependents to Check Plots and Error
+	predL.AssignDep(prdzL, prdgL)
+	predW.AssignDep(prdzW, prdgW)
+	predC.AssignDep(prdzC, prdgC)
+	predH.AssignDep(prdzH, prdgH)
+	predR.AssignDep(prdzR, prdgR)
+	#predRbf.AssignDep(prdzrbf, [0])
+
+	if CheckResults:
+
+		## Plot All Results, Point Locations, and Error.  Since this will 
+		# probably vary greatly per analysis, this function was not commented
+		# a lot and was just written without much care for aesthetics or cost.
+		print
+		print '^---- Checking Results ----^'
+		print
+		
+		if (dim == 3):
+			actul.PlotResults('Actual Data')
+			train.PlotResults('Training Data', pp)
+		
+			predL.PlotAll('LN Predicted Data', trainLNInt, 'LN', 
+					pltfile='None', erplot=erplot, check=False, ptplot = False,
+					step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+			predW.PlotAll('WN Predicted Data', trainWNInt, 'WN',
+					pltfile='None', erplot=erplot, check=False, ptplot = False,
+					step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+			predC.PlotAll('CN Predicted Data', trainCNInt, 'CN',
+					pltfile='None', erplot=erplot, check=False, ptplot = False,
+					step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+			predH.PlotAll('HN Predicted Data', trainHNInt, 'HN',
+					pltfile='None', erplot=erplot, check=False, ptplot = False,
+					step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+			predR.PlotAll('CR Predicted Data', trainCRInt, 'CR',
+					pltfile='None', erplot=erplot, check=False, ptplot = False,
+					step=step, neighs=N, DistEff=DE, tension=t, bias=b, tight=tt)
+		#	predRbf.PlotResults('RBF Predicted Data', pltfile='None')
+		#	predRbf.FindError('RBF Predicted Data', pltfile='None', plot=True, 
+		#				  check=False, step=0.00000001)
+		elif (dim == 2):
 			fig = plt.figure()
-			title = 'Linear'
-			
-			Px = predL.points[:,0].flatten()
-			Py = predL.values[:,0].flatten()
-			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-			fig.suptitle('%s Data Results' % title, 
-							fontsize=14, fontweight='bold')
-			plt.xlabel('Independent Variable')
-			plt.ylabel('Dependent Variable')
+			ax = plt.subplot(111)	
+			Ax = actul.points[:,0].flatten()
+			Ay = actul.values[:,0].flatten()
+			Tx = train.points[:,0].flatten()
+			Ty = train.values[:,0].flatten()
+			Lx = predL.points[:,0].flatten()
+			Ly = predL.values[:,0].flatten()
+			Wx = predW.points[:,0].flatten()
+			Wy = predW.values[:,0].flatten()
+			Cx = predC.points[:,0].flatten().real
+			Cy = predC.values[:,0].flatten().real
+			Hx = predH.points[:,0].flatten().real
+			Hy = predH.values[:,0].flatten().real
+			Rx = predR.points[:,0].flatten().real
+			Ry = predR.values[:,0].flatten().real
+			xmi = np.min(Ax)
+			xma = np.max(Ax)
+			ymi = np.min(Ay)
+			yma = np.max(Ay)
+			ax.plot(Tx, Ty, 'bo', label='Training')
+			ax.plot(Ax, Ay, 'k-', linewidth=2., label='Actual')
+			ax.plot(Lx, Ly, 'm--', linewidth=2., label='Linear')
+			ax.plot(Wx, Wy, '--', linewidth=2., color=[0.,.38,1.], label='Weighted')
+			ax.plot(Cx, Cy, 'g--', linewidth=2., label='Cosine')
+			ax.plot(Hx, Hy, 'r--', linewidth=2., label='Hermite')
+			ax.plot(Rx, Ry, '--', linewidth=2., color=[1.,.48,0.], label='CS-RBF')
+			box = ax.get_position()
+			ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+			ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+			ax.set_title('%s Predicted Data Results' % problem,
+							fontsize=16, fontweight='bold')
+			ax.set_xlabel('Independent Variable', fontsize=14)
+			ax.set_ylabel('Dependent Variable', fontsize=14)
+			plt.tick_params(labelsize=14)
 			plt.xlim(xmi, xma)
 			plt.ylim(ymi, yma)
-			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
-			
-			fig = plt.figure()
-			title = 'Weighted'
-			
-			Px = predW.points[:,0].flatten()
-			Py = predW.values[:,0].flatten()
-			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-			fig.suptitle('%s Data Results' % title, 
-							fontsize=14, fontweight='bold')
-			plt.xlabel('Independent Variable')
-			plt.ylabel('Dependent Variable')
-			plt.xlim(xmi, xma)
-			plt.ylim(ymi, yma)
-			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
 		
-			fig = plt.figure()
-			title = 'Cosine'
+			if (allplot == True):
+				fig = plt.figure()
+				title = 'Linear'
+				
+				Px = predL.points[:,0].flatten()
+				Py = predL.values[:,0].flatten()
+				plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+				fig.suptitle('%s Data Results' % title, 
+								fontsize=14, fontweight='bold')
+				plt.xlabel('Independent Variable')
+				plt.ylabel('Dependent Variable')
+				plt.xlim(xmi, xma)
+				plt.ylim(ymi, yma)
+				plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+				
+				fig = plt.figure()
+				title = 'Weighted'
+				
+				Px = predW.points[:,0].flatten()
+				Py = predW.values[:,0].flatten()
+				plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+				fig.suptitle('%s Data Results' % title, 
+								fontsize=14, fontweight='bold')
+				plt.xlabel('Independent Variable')
+				plt.ylabel('Dependent Variable')
+				plt.xlim(xmi, xma)
+				plt.ylim(ymi, yma)
+				plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
 			
-			Px = predC.points[:,0].flatten().real
-			Py = predC.values[:,0].flatten().real
-			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-			fig.suptitle('%s Data Results' % title, 
-							fontsize=14, fontweight='bold')
-			plt.xlabel('Independent Variable')
-			plt.ylabel('Dependent Variable')
-			plt.xlim(xmi, xma)
-			plt.ylim(ymi, yma)
-			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+				fig = plt.figure()
+				title = 'Cosine'
+				
+				Px = predC.points[:,0].flatten().real
+				Py = predC.values[:,0].flatten().real
+				plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+				fig.suptitle('%s Data Results' % title, 
+								fontsize=14, fontweight='bold')
+				plt.xlabel('Independent Variable')
+				plt.ylabel('Dependent Variable')
+				plt.xlim(xmi, xma)
+				plt.ylim(ymi, yma)
+				plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+				
+				fig = plt.figure()
+				title = 'Hermite'
+				
+				Px = predH.points[:,0].flatten().real
+				Py = predH.values[:,0].flatten().real
+				plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+				fig.suptitle('%s Data Results' % title, 
+								fontsize=14, fontweight='bold')
+				plt.xlabel('Independent Variable')
+				plt.ylabel('Dependent Variable')
+				plt.xlim(xmi, xma)
+				plt.ylim(ymi, yma)
+				plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
 			
-			fig = plt.figure()
-			title = 'Hermite'
+				fig = plt.figure()
+				title = 'CRBF'
+				
+				Px = predR.points[:,0].flatten().real
+				Py = predR.values[:,0].flatten().real
+				plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
+				fig.suptitle('%s Data Results' % title, 
+								fontsize=14, fontweight='bold')
+				plt.xlabel('Independent Variable')
+				plt.ylabel('Dependent Variable')
+				plt.xlim(xmi, xma)
+				plt.ylim(ymi, yma)
+				plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+				
+			predL.FindError('LN Predicted Data', 'None', erplot, False)
+			predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 			
-			Px = predH.points[:,0].flatten().real
-			Py = predH.values[:,0].flatten().real
-			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-			fig.suptitle('%s Data Results' % title, 
-							fontsize=14, fontweight='bold')
-			plt.xlabel('Independent Variable')
-			plt.ylabel('Dependent Variable')
-			plt.xlim(xmi, xma)
-			plt.ylim(ymi, yma)
-			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+			predW.FindError('WN Predicted Data', 'None', erplot, False)
+			predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 		
-			fig = plt.figure()
-			title = 'CRBF'
+			predC.FindError('CN Predicted Data', 'None', erplot, False)
+			predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		
+			predH.FindError('HN Predicted Data', 'None', erplot, False)
+			predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 			
-			Px = predR.points[:,0].flatten().real
-			Py = predR.values[:,0].flatten().real
-			plt.plot(Ax, Ay, 'k-', Px, Py, 'r-', Tx, Ty, 'bo')
-			fig.suptitle('%s Data Results' % title, 
-							fontsize=14, fontweight='bold')
-			plt.xlabel('Independent Variable')
-			plt.ylabel('Dependent Variable')
-			plt.xlim(xmi, xma)
-			plt.ylim(ymi, yma)
-			plt.legend(['Actual', 'Predicted', 'Training'], loc='upper left')
+			predR.FindError('CR Predicted Data', 'None', erplot, False)
+			predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		else:
 			
-		predL.FindError('LN Predicted Data', 'None', erplot, False)
-		predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+			predL.FindError('LN Predicted Data', 'None', erplot, False)
+			predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+			predW.FindError('WN Predicted Data', 'None', erplot, False)
+			predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+			predC.FindError('CN Predicted Data', 'None', erplot, False)
+			predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+			predH.FindError('HN Predicted Data', 'None', erplot, False)
+			predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+			predR.FindError('CR Predicted Data', 'None', erplot, False)
+			predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
+							pltfile='None',plot=erplot,check=False,
+							step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
 		
-		predW.FindError('WN Predicted Data', 'None', erplot, False)
-		predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	
-		predC.FindError('CN Predicted Data', 'None', erplot, False)
-		predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	
-		predH.FindError('HN Predicted Data', 'None', erplot, False)
-		predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
+		print '<< Run Times >>'
+		print
+		print '-LN Interpolator Setup:', (p1-p0)
+		print '-LN Interpolator Value Query:', (tp5-t0)
+		print '-LN Interpolator Gradient Query:', (t1-tp5)
+		print
+		print '-WN Interpolator Setup:', (p2-p1)
+		print '-WN Interpolator Value Query:', (t1p5-t1)
+		print '-WN Interpolator Gradient Query:', (t2-t1p5)
+		print
+		print '-CN Interpolator Setup:', (p3-p2)
+		print '-CN Interpolator Value Query:', (t2p5-t2)
+		print '-CN Interpolator Gradient Query:', (t3-t2p5)
+		print
+		print '-HN Interpolator Setup:', (p4-p3)
+		print '-HN Interpolator Value Query:', (t3p5-t3)
+		print '-HN Interpolator Gradient Query:', (t4-t3p5)
+		print
+		print '-CR Interpolator Setup:', (p5-p4)
+		print '-CR Interpolator Value Query:', (t4p5-t4)
+		print '-CR Interpolator Gradient Query:', (t5-t4p5)
+		print
+		'''	
+		print '-RBF Interpolator Setup:', (prbf-p5)
+		print '-RBF Interpolator Value Query:', (trbf-t5)
+		print
 		
-		predR.FindError('CR Predicted Data', 'None', erplot, False)
-		predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	else:
-		
-		predL.FindError('LN Predicted Data', 'None', erplot, False)
-		predL.CheckGrad('LN Predicted Data',trainLNInt,'LN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-		predW.FindError('WN Predicted Data', 'None', erplot, False)
-		predW.CheckGrad('WN Predicted Data',trainWNInt,'WN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-		predC.FindError('CN Predicted Data', 'None', erplot, False)
-		predC.CheckGrad('CN Predicted Data',trainCNInt,'CN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-		predH.FindError('HN Predicted Data', 'None', erplot, False)
-		predH.CheckGrad('HN Predicted Data',trainHNInt,'HN',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-		predR.FindError('CR Predicted Data', 'None', erplot, False)
-		predR.CheckGrad('CR Predicted Data',trainCRInt,'CR',
-						pltfile='None',plot=erplot,check=False,
-						step=step,N=N,DistEff=DE,tension=t,bias=b,tight=tt)
-	
-	print '<< Run Times >>'
-	print
-	print '-LN Interpolator Setup:', (p1-p0)
-	print '-LN Interpolator Value Query:', (tp5-t0)
-	print '-LN Interpolator Gradient Query:', (t1-tp5)
-	print
-	print '-WN Interpolator Setup:', (p2-p1)
-	print '-WN Interpolator Value Query:', (t1p5-t1)
-	print '-WN Interpolator Gradient Query:', (t2-t1p5)
-	print
-	print '-CN Interpolator Setup:', (p3-p2)
-	print '-CN Interpolator Value Query:', (t2p5-t2)
-	print '-CN Interpolator Gradient Query:', (t3-t2p5)
-	print
-	print '-HN Interpolator Setup:', (p4-p3)
-	print '-HN Interpolator Value Query:', (t3p5-t3)
-	print '-HN Interpolator Gradient Query:', (t4-t3p5)
-	print
-	print '-CR Interpolator Setup:', (p5-p4)
-	print '-CR Interpolator Value Query:', (t4p5-t4)
-	print '-CR Interpolator Gradient Query:', (t5-t4p5)
-	print
-	'''	
-	print '-RBF Interpolator Setup:', (prbf-p5)
-	print '-RBF Interpolator Value Query:', (trbf-t5)
-	print
-	
-	with open("RBFTimes.txt", "a") as efile:
-		efile.write("Number of Training Points:"+str(len(train.points[:,0]))+"\n")   
-		efile.write("CSRBF Setup:"+str(p5-p4)+"\n")       
-		efile.write("CSRBF Query:"+str(t4p5-t4)+"\n")       
-		efile.write("RBF Setup:"+str(prbf-p5)+"\n")       
-		efile.write("RBF Query:"+str(trbf-t5)+"\n")       
-		efile.write("\n")
-		
-	with open("RunError.txt", "a") as efile:
-		efile.write(predL.funct+ "\n")       
-		efile.write("Run"+ "\n")
-		efile.write(              "LN"+ "\n")
-		efile.write(str(np.average(predL.error))  + "\n") 
-		efile.write(str(    np.max(predL.error))  + "\n")
-		efile.write(str(np.average(predL.gaerror))+ "\n")
-		efile.write(str(    np.max(predL.gaerror))+ "\n")
-		efile.write(str(np.average(predL.gcerror))+ "\n")
-		efile.write(str(    np.max(predL.gcerror))+ "\n")
-		efile.write(              "WN"+ "\n")
-		efile.write(str(np.average(predW.error))  + "\n") 
-		efile.write(str(    np.max(predW.error))  + "\n")
-		efile.write(str(np.average(predW.gaerror))+ "\n") 
-		efile.write(str(    np.max(predW.gaerror))+ "\n") 
-		efile.write(str(np.average(predW.gcerror))+ "\n") 
-		efile.write(str(    np.max(predW.gcerror))+ "\n") 
-		efile.write(              "CN"+ "\n")
-		efile.write(str(np.average(predC.error))  + "\n") 
-		efile.write(str(    np.max(predC.error))  + "\n")
-		efile.write(str(np.average(predC.gaerror))+ "\n") 
-		efile.write(str(    np.max(predC.gaerror))+ "\n") 
-		efile.write(str(np.average(predC.gcerror))+ "\n") 
-		efile.write(str(    np.max(predC.gcerror))+ "\n") 
-		efile.write(              "HN"+ "\n")
-		efile.write(str(np.average(predH.error))  + "\n") 
-		efile.write(str(    np.max(predH.error))  + "\n")
-		efile.write(str(np.average(predH.gaerror))+ "\n") 
-		efile.write(str(    np.max(predH.gaerror))+ "\n") 
-		efile.write(str(np.average(predH.gcerror))+ "\n") 
-		efile.write(str(    np.max(predH.gcerror))+ "\n") 
-		efile.write(              "RN"+ "\n")
-		efile.write(str(np.average(predR.error))  + "\n") 
-		efile.write(str(    np.max(predR.error))  + "\n")
-		efile.write(str(np.average(predR.gaerror))+ "\n")
-		efile.write(str(    np.max(predR.gaerror))+ "\n")
-		efile.write(str(np.average(predR.gcerror))+ "\n")
-		efile.write(str(    np.max(predR.gcerror))+ "\n")
-		efile.write("\n")
-	'''
-	#pp.close()
+		with open("RBFTimes.txt", "a") as efile:
+			efile.write("Number of Training Points:"+str(len(train.points[:,0]))+"\n")   
+			efile.write("CSRBF Setup:"+str(p5-p4)+"\n")       
+			efile.write("CSRBF Query:"+str(t4p5-t4)+"\n")       
+			efile.write("RBF Setup:"+str(prbf-p5)+"\n")       
+			efile.write("RBF Query:"+str(trbf-t5)+"\n")       
+			efile.write("\n")
+			
+		with open("RunError.txt", "a") as efile:
+			efile.write(predL.funct+ "\n")       
+			efile.write("Run"+ "\n")
+			efile.write(              "LN"+ "\n")
+			efile.write(str(np.average(predL.error))  + "\n") 
+			efile.write(str(    np.max(predL.error))  + "\n")
+			efile.write(str(np.average(predL.gaerror))+ "\n")
+			efile.write(str(    np.max(predL.gaerror))+ "\n")
+			efile.write(str(np.average(predL.gcerror))+ "\n")
+			efile.write(str(    np.max(predL.gcerror))+ "\n")
+			efile.write(              "WN"+ "\n")
+			efile.write(str(np.average(predW.error))  + "\n") 
+			efile.write(str(    np.max(predW.error))  + "\n")
+			efile.write(str(np.average(predW.gaerror))+ "\n") 
+			efile.write(str(    np.max(predW.gaerror))+ "\n") 
+			efile.write(str(np.average(predW.gcerror))+ "\n") 
+			efile.write(str(    np.max(predW.gcerror))+ "\n") 
+			efile.write(              "CN"+ "\n")
+			efile.write(str(np.average(predC.error))  + "\n") 
+			efile.write(str(    np.max(predC.error))  + "\n")
+			efile.write(str(np.average(predC.gaerror))+ "\n") 
+			efile.write(str(    np.max(predC.gaerror))+ "\n") 
+			efile.write(str(np.average(predC.gcerror))+ "\n") 
+			efile.write(str(    np.max(predC.gcerror))+ "\n") 
+			efile.write(              "HN"+ "\n")
+			efile.write(str(np.average(predH.error))  + "\n") 
+			efile.write(str(    np.max(predH.error))  + "\n")
+			efile.write(str(np.average(predH.gaerror))+ "\n") 
+			efile.write(str(    np.max(predH.gaerror))+ "\n") 
+			efile.write(str(np.average(predH.gcerror))+ "\n") 
+			efile.write(str(    np.max(predH.gcerror))+ "\n") 
+			efile.write(              "RN"+ "\n")
+			efile.write(str(np.average(predR.error))  + "\n") 
+			efile.write(str(    np.max(predR.error))  + "\n")
+			efile.write(str(np.average(predR.gaerror))+ "\n")
+			efile.write(str(    np.max(predR.gaerror))+ "\n")
+			efile.write(str(np.average(predR.gcerror))+ "\n")
+			efile.write(str(    np.max(predR.gcerror))+ "\n")
+			efile.write("\n")
+		'''
+		#pp.close()
 
 
 ## More Information (As Promised) ==============================================
@@ -1705,123 +1735,46 @@ df CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum,
 	rtrn problem, dimensions, neighbors, DistanceEffect, tension, \
 			bias, tight, NumLeaves, maximum, minimum
 
-df CheckResults():
-
+df RunTestCode():
 
 Note - some vowels removed to ensure vim friendliness.
 '''
+
+
 ## Running Code ================================================================
 
-
-print 
-print '^---- N Dimensional Interpolation ----^'
-print 
-
-#pp = PdfPages('ND_Interpolation_Plots.pdf') # Variable for saved file
-pp = 'None'
-step = 0.00000001 # Complex step step size
-
-## Problem Inputs and put into simpler variables
+## Problem Inputs 
 dimensions = 0 # If 0, the dimensions is chosen from the problem type
 minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
-trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
-prddist = 'LH' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = 'PW' # Problem type, options seen in organize inputs loop below
+trndist = 'cart' # Can be rand, LH, or cart (only for 2D and 3D)
+prddist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
+problem = '2D3O' # Problem type, options seen in organize inputs loop below
 
-trnpoints = 10 # Number of training pts, min of 5 because of Hermite lims
+trnpoints = 100 # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000 # Number of prediction points
 
 neighbors = 0 # KD-Tree neighbors found, default 0, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
-comp = -3 # Type of CRBF used in the CR interpolation, default -2
+comp = 4 # Type of CRBF used in the CR interpolation, default 4
 NumLeaves = 0 # Leaves of KD Tree, default 0
 
-## Check and shorten inputs for ease of typing:
-# pr=problem, dim=dimensions, N=neighbors, DE=DistanceEffect, 
-# t=tension, b=bias, tt=tight, NL=NumLeaves, maxi=maximum, mini=minimum
-pr, dim, N, DE, t, b, tt, NL, maxi, mini = \
-		CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum, 
-				problem, dimensions, DistanceEffect, tension, bias)
-
 ## Extra Inputs
-## Can override tt here
+CheckResults = True #All results will not be checked if this is false
+step = 0.00000001 # Complex step step size
 allplot = False #For 2D, plot separate graphs for each interp
 erplot = False #Choose to plot error
-AbyT = 1 # Multilpier for actual to training data points
+AbyT = 100 # Multilpier for actual to training data points
 ptplot = False #For plotting the predicted point locations
+# Variable for saved file of multiple plots
+#pp = PdfPages('ND_Interpolation_Plots.pdf') 
+pp = 'None'
 
-## Create the Independent Data
-train = N_Data(mini, maxi, trnpoints, pr, trndist, dim)
-actul = N_Data(mini, maxi, (trnpoints*AbyT), pr, trndist, dim)
-predL = N_Data(mini, maxi, prdpoints, pr, prddist, dim)
-predW = cp.deepcopy(predL)
-predC = cp.deepcopy(predL)
-predH = cp.deepcopy(predL)
-predR = cp.deepcopy(predL)
-#predRbf = cp.deepcopy(predL)
+RunTestCode()
 
-## Set Dependents for Training Data and Plot
-train.CreateDep()
-actul.CreateDep()
-
-# Setup Interpolation Methods around Training Points
-p0 = time.time()
-trainLNInt = LNInterp(train.points, train.values, NL)
-p1 = time.time()
-trainWNInt = WNInterp(train.points, train.values, NL)
-p2 = time.time()
-trainCNInt = CNInterp(train.points, train.values, NL)
-p3 = time.time()
-trainHNInt = HNInterp(train.points, train.values, NL)
-p4 = time.time()
-trainCRInt = CRInterp(train.points, train.values, NL, N, comp)
-p5 = time.time()
-#rbfi = interp.Rbf(train.points[:,0], train.points[:,1], train.values[:,0], function='multiquadric')
-#prbf = time.time()
-
-print
-print '^---- Running Interpolation Code ----^'
-print
-
-# Perform Interpolation on Predicted Points
-t0 = time.time()
-prdzL = trainLNInt(predL.points)
-tp5 = time.time()
-prdgL = trainLNInt.gradient(predL.points)
-t1 = time.time()
-prdzW = trainWNInt(predW.points, N, DE)
-t1p5 = time.time()
-prdgW = trainWNInt.gradient(predW.points, N, DE)
-t2 = time.time()
-prdzC = trainCNInt(predC.points, N)
-t2p5 = time.time()
-prdgC = trainCNInt.gradient(predC.points, N)
-t3 = time.time()
-prdzH = trainHNInt(predH.points, N, t, b, tt)
-t3p5 = time.time()
-prdgH = trainHNInt.gradient(predH.points, N, t, b, tt)
-t4 = time.time()
-prdzR = trainCRInt(predR.points)
-t4p5 = time.time()
-prdgR = trainCRInt.gradient(predR.points)
-t5 = time.time()
-#prdzrbf = rbfi(predRbf.points[:,0],predRbf.points[:,1])
-#trbf = time.time()
-
-## Assign all Dependents to Check Plots and Error
-predL.AssignDep(prdzL, prdgL)
-predW.AssignDep(prdzW, prdgW)
-predC.AssignDep(prdzC, prdgC)
-predH.AssignDep(prdzH, prdgH)
-predR.AssignDep(prdzR, prdgR)
-#predRbf.AssignDep(prdzrbf, [0])
-
-CheckResults()
-
-#plt.show()                              
+plt.show()                              
 
 '''
 Side note: PrdPts are predicted points technically, although it's not really 
