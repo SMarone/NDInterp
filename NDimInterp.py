@@ -122,7 +122,7 @@ class N_Data(object):
 		self.funct = funct
 		self.dtype = dtype
 		self.dims = dims
-		
+		'''
 		print "Creating Independent Data"
 		print "-Function Type:", funct
 		print "-Data Distribution Type:", dtype
@@ -131,6 +131,7 @@ class N_Data(object):
 		for d in range(dims-1):
 			print "-Range of dimension %s: [%s,%s]" % ((d+1), mini[d], maxi[d])
 		print
+		'''
 		## Setup independent data for each function via distribution
 		if (dtype == 'rand'):
 			self.points = np.random.rand(numpts,dims-1) * \
@@ -182,15 +183,15 @@ class N_Data(object):
 
 	def AssignDep(self, values, gradient=[0]):
 		## Takes numpy array of values and stores inside the class variable
-		print '**Assigning Dependent Data**'
-		print
+		#print '**Assigning Dependent Data**'
+		#print
 		self.values = values[:,np.newaxis]
 		self.gradient=gradient
 
 	def CreateDep(self):
 		## This creates the dependant from the specified function type
-		print '**Creating Dependent Data from Problem Library**'
-		print
+		#print '**Creating Dependent Data from Problem Library**'
+		#print
 		z = Solve(self.points,self.funct)	
 		self.values = z[:,np.newaxis]
 
@@ -1747,11 +1748,11 @@ Note - some vowels removed to ensure vim friendliness.
 dimensions = 0 # If 0, the dimensions is chosen from the problem type
 minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
-trndist = 'cart' # Can be rand, LH, or cart (only for 2D and 3D)
+trndist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = '2D3O' # Problem type, options seen in organize inputs loop below
+problem = 'Crate' # Problem type, options seen in organize inputs loop below
 
-trnpoints = 100 # Number of training pts, min of 5 because of Hermite lims
+trnpoints = 10000 # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000 # Number of prediction points
 
 neighbors = 0 # KD-Tree neighbors found, default 0, min 2
@@ -1766,7 +1767,7 @@ CheckResults = True #All results will not be checked if this is false
 step = 0.00000001 # Complex step step size
 allplot = False #For 2D, plot separate graphs for each interp
 erplot = False #Choose to plot error
-AbyT = 100 # Multilpier for actual to training data points
+AbyT = 1 # Multilpier for actual to training data points
 ptplot = False #For plotting the predicted point locations
 # Variable for saved file of multiple plots
 #pp = PdfPages('ND_Interpolation_Plots.pdf') 
