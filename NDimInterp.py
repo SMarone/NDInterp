@@ -1274,7 +1274,7 @@ def CheckInputs(neighbors, trnpoints, NumLeaves, maximum, minimum,
 	
 	if (len(maximum) != (dimensions-1)):
 		print "Due to being incorrectly inputted, the program is now"
-		print "adjustng the maximum and minimum settings."
+		print "adjusting the maximum and minimum settings."
 		print
 		mini = minimum[0]
 		maxi = maximum[0]
@@ -1427,10 +1427,10 @@ def RunTestCode():
 			ax.plot(Tx, Ty, 'bo', label='Training')
 			ax.plot(Ax, Ay, 'k-', linewidth=2., label='Actual')
 			ax.plot(Lx, Ly, 'm--', linewidth=2., label='Linear')
-			ax.plot(Wx, Wy, '--', linewidth=2., color=[0.,.38,1.], label='Weighted')
-			ax.plot(Cx, Cy, 'g--', linewidth=2., label='Cosine')
-			ax.plot(Hx, Hy, 'r--', linewidth=2., label='Hermite')
-			ax.plot(Rx, Ry, '--', linewidth=2., color=[1.,.48,0.], label='CS-RBF')
+			#ax.plot(Wx, Wy, '--', linewidth=2., color=[0.,.38,1.], label='Weighted')
+			#ax.plot(Cx, Cy, 'g--', linewidth=2., label='Cosine')
+			#ax.plot(Hx, Hy, 'r--', linewidth=2., label='Hermite')
+			#ax.plot(Rx, Ry, '--', linewidth=2., color=[1.,.48,0.], label='CS-RBF')
 			box = ax.get_position()
 			ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 			ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -1749,17 +1749,17 @@ minimum = np.array([-500, -500]) # Minimum value for independent range
 maximum = np.array([500, 500]) # Maximum value for independent range
 trndist = 'cart' # Can be rand, LH, or cart (only for 2D and 3D)
 prddist = 'rand' # Can be rand, LH, or cart (only for 2D and 3D)
-problem = '2D3O' # Problem type, options seen in organize inputs loop below
+problem = '2D5O' # Problem type, options seen in organize inputs loop below
 
-trnpoints = 100 # Number of training pts, min of 5 because of Hermite lims
+trnpoints = 10 # Number of training pts, min of 5 because of Hermite lims
 prdpoints = 3000 # Number of prediction points
 
-neighbors = 0 # KD-Tree neighbors found, default 0, min 2
+neighbors = 100 # KD-Tree neighbors found, default 0, min 2
 DistanceEffect = 2 # Effect of distance of neighbors in WN, default 2
 tension = 0 # Hermite adjustable, loose is -ive, tight fit is +ive, default 0
 bias = 0 # Attention to each closest neighbor in hermite, default 0
-comp = 4 # Type of CRBF used in the CR interpolation, default 4
-NumLeaves = 0 # Leaves of KD Tree, default 0
+comp = -2 # Type of CRBF used in the CR interpolation, default 4
+NumLeaves = 10 # Leaves of KD Tree, default 0
 
 ## Extra Inputs
 CheckResults = True #All results will not be checked if this is false
@@ -1774,7 +1774,8 @@ pp = 'None'
 
 RunTestCode()
 
-plt.show()                              
+plt.show()
+#plt.savefig('Lin2.eps', format='eps', dpi=1000)
 
 '''
 Side note: PrdPts are predicted points technically, although it's not really 

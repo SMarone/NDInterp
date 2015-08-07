@@ -118,9 +118,9 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 		if maptype == 'RLINE':
 			if overlay == 0:
 				pylab.plot( x, y, color='blue' )
-				pylab.text( x[0], y[0],
-				'speed '+str(mapdata[alpha][i][j][1]), ha='right', va='bottom',
-				fontsize='8', color='blue', rotation=-35 )
+				#pylab.text( x[0], y[0],
+				#'speed '+str(mapdata[alpha][i][j][1]), ha='right', va='bottom',
+				#fontsize='8', color='blue', rotation=-35 )
 			else:
 				pylab.plot( x, y, color=linecolors[alpha] )
 
@@ -131,25 +131,26 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 	EFF=np.array(EFF)
 	NC=np.array(NC)
 	RL=np.array(RL)
-
+	
+	levels = [.5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
 	if overlay == 0:
 		#  PLOT EFFICIENCY CONTOURS ONLY ON NON-OVERLAID MAPS
 		if Veff != []:
 			if filled == 0:
-				pylab.contour(WC,PR,EFF,Veff)
+				pylab.contour(WC,PR,EFF,Veff,levels)
 				cb = pylab.colorbar(ticks=Veff)
 				cb.ax.set_ylabel('Veff')
 			else:
-				pylab.contourf(WC,PR,EFF,Veff)
+				pylab.contourf(WC,PR,EFF,Veff,levels)
 				cb = pylab.colorbar(ticks=Veff)
 				cb.ax.set_ylabel('Veff')
 		else:
 			if filled == 0:
-				pylab.contour(WC,PR,EFF)
+				pylab.contour(WC,PR,EFF,levels)
 				cb = pylab.colorbar()
 				cb.ax.set_ylabel('Eff')
 			else:
-				pylab.contourf(WC,PR,EFF)
+				pylab.contourf(WC,PR,EFF,levels)
 				cb = pylab.colorbar()
 				cb.ax.set_ylabel('Eff')
 
@@ -159,7 +160,7 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 				CS = pylab.contour(WC,PR,NC,Vspd,colors='blue')
 				pylab.clabel(CS,Vspd,colors='blue',fmt='%3.0f')
 			else:
-				pylab.contour(WC,PR,NC,colors='blue')
+				pylab.contour(WC,PR,NC,levels,colors='blue')
 
 		#  PLOT RLINE CONTOURS FOR RLINE MAPS
 		if maptype == 'RLINE' and show_lines == 1:
@@ -168,7 +169,7 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 						colors='green')
 				pylab.clabel(CS,Vspd,colors='green',fmt='%1.2f')
 			else:
-				pylab.contour(WC,PR,RL, linewidths=0.5, colors='green')
+				pylab.contour(WC,PR,RL,levels,linewidths=0.5, colors='green')
 
 	else:
 		#  PLOT SPEED CONTOURS FOR BETA MAPS
@@ -177,7 +178,7 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 				CS = pylab.contour(WC,PR,NC,Vspd,colors=linecolors[alpha])
 				pylab.clabel(CS,Vspd,colors=linecolors[alpha],fmt='%3.0f')
 			else:
-				pylab.contour(WC,PR,NC,colors=linecolors[alpha])
+				pylab.contour(WC,PR,NC,levels,colors=linecolors[alpha])
 
 		#  PLOT RLINE CONTOURS FOR RLINE MAPS
 		if maptype == 'RLINE' and show_lines == 1:
@@ -185,9 +186,9 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 				CS = pylab.contour(WC,PR,RL,Vspd,colors=linecolors[alpha])
 				pylab.clabel(CS,Vspd,colors=linecolors[alpha],fmt='%1.2f')
 			else:
-				pylab.contour(WC,PR,RL,colors=linecolors[alpha])
+				pylab.contour(WC,PR,RL,levels,colors=linecolors[alpha])
 
-
+	'''
 	#  PLOT THE OPERATING POINTS
 	pntx=[]	 # array of corrected flow values for all of the saved points
 	pnty=[]	 # array of PR values for all of the saved points
@@ -195,9 +196,9 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 		pntx.append( points_data[p][component][4] )
 		pnty.append( points_data[p][component][5] )
 
-
 	# Seidel attempt at Operating Point data labels  
-	for p in range(0,len(points_data)):
+	for
+	p in range(0,len(points_data)):
 		pointlabel= points_data[p][component][1]
 		if (p/4.) == int(p/4.):
 			yfact=1.08
@@ -216,6 +217,7 @@ def plot_compressor(mapname, maptype, mapdata, scaled_map, scalars, overlay,
 			yfact=0.92
 			pylab.text( pntx[p], pnty[p]*yfact, pointlabel, fontsize='8', color='white', rotation=0 )
 			pylab.plot( pntx[p], pnty[p], 'ws' , ms=4.0 )
+	'''
 
 	#  SET PLOT AXES IF SUPPLIED, LABEL AXES AND TITLE 
 	if axes != []:
@@ -280,6 +282,7 @@ pylab.spectral()
 
 for component in range(len(component_list)-1):
 
+	tight = True
 	alpha = 0
 	axes = []
 	Veff = []
